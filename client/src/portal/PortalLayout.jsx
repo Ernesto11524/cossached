@@ -31,6 +31,7 @@ export default function PortalLayout({ title, activeTab, setTab, children }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [unreadMsg, setUnreadMsg] = useState(0)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -43,9 +44,25 @@ export default function PortalLayout({ title, activeTab, setTab, children }) {
     return () => { alive = false; clearInterval(id) }
   }, [activeTab])
 
+  // Close the mobile drawer whenever the active tab changes
+  useEffect(() => { setMobileNavOpen(false) }, [activeTab])
+
+  // Lock body scroll while drawer is open on mobile
+  useEffect(() => {
+    document.body.style.overflow = mobileNavOpen ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [mobileNavOpen])
+
+  // Wrap tab setter so links in the mobile drawer close it on click
+  const handleTab = (id) => { setTab(id); setMobileNavOpen(false) }
+
   return (
     <div className="portal-layout">
-      <aside className="sidebar">
+      {mobileNavOpen && (
+        <div className="sidebar-backdrop" onClick={() => setMobileNavOpen(false)} />
+      )}
+
+      <aside className={`sidebar ${mobileNavOpen ? 'open' : ''}`}>
         <div className="sidebar-user">
           <Avatar
             name={user?.name}
@@ -63,7 +80,7 @@ export default function PortalLayout({ title, activeTab, setTab, children }) {
             <div
               key={item.id}
               className={`sidebar-item ${activeTab === item.id ? 'active' : ''}`}
-              onClick={() => setTab(item.id)}
+              onClick={() => handleTab(item.id)}
             >
               <span className="si-icon">{item.icon}</span>
               <span style={{ flex: 1 }}>{item.label}</span>
@@ -78,7 +95,7 @@ export default function PortalLayout({ title, activeTab, setTab, children }) {
             <div
               key={item.id}
               className={`sidebar-item ${activeTab === item.id ? 'active' : ''}`}
-              onClick={() => setTab(item.id)}
+              onClick={() => handleTab(item.id)}
             >
               <span className="si-icon">{item.icon}</span>
               {item.label}
@@ -92,7 +109,7 @@ export default function PortalLayout({ title, activeTab, setTab, children }) {
                 <div
                   key={item.id}
                   className={`sidebar-item ${activeTab === item.id ? 'active' : ''}`}
-                  onClick={() => setTab(item.id)}
+                  onClick={() => handleTab(item.id)}
                 >
                   <span className="si-icon">{item.icon}</span>
                   {item.label}
@@ -118,15 +135,24 @@ export default function PortalLayout({ title, activeTab, setTab, children }) {
 
       <div className="portal-main">
         <div className="portal-header">
+          <button
+            type="button"
+            className="portal-hamburger"
+            onClick={() => setMobileNavOpen(true)}
+            aria-label="Open menu"
+          >
+            ☰
+          </button>
           <h1>{title}</h1>
           <div className="portal-header-right">
-            <NotificationBell onNavigate={setTab} />
+            <NotificationBell onNavigate={handleTab} />
             <div
+              className="portal-header-user"
               style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
-              onClick={() => setTab('profile')}
+              onClick={() => handleTab('profile')}
             >
               <Avatar name={user?.name} avatarFilename={user?.avatarFilename} size={34} />
-              <span style={{ fontSize: 13, fontWeight: 500, color: T.textDark }}>
+              <span className="portal-header-username" style={{ fontSize: 13, fontWeight: 500, color: T.textDark }}>
                 {user?.name}
               </span>
             </div>
