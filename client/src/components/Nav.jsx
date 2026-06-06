@@ -104,7 +104,7 @@ export default function Nav() {
               </Link>
             ))}
 
-            <div style={{ height: '1.2rem' }} />
+            <div style={{ height: '0.5rem' }} />
 
             {user ? (
               <>

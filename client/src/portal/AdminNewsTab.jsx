@@ -288,51 +288,96 @@ export default function AdminNewsTab() {
               No articles yet. Click "New Article" to publish your first one.
             </p>
           ) : (
-            <table className="doc-table">
-              <thead>
-                <tr><th>Title</th><th>Category</th><th>Media</th><th>Published</th><th>Action</th></tr>
-              </thead>
-              <tbody>
+            <>
+              {/* Desktop: table */}
+              <table className="doc-table admin-news-table-desktop">
+                <thead>
+                  <tr><th>Title</th><th>Category</th><th>Media</th><th>Published</th><th>Action</th></tr>
+                </thead>
+                <tbody>
+                  {articles.map(a => (
+                    <tr key={a.id}>
+                      <td>
+                        <div style={{ fontWeight: 500, color: T.brownDeep, fontSize: 13.5 }}>{a.title}</div>
+                        <div style={{ fontSize: 11, color: T.brownPale, marginTop: 2 }}>
+                          {a.excerpt?.slice(0, 80)}…
+                        </div>
+                      </td>
+                      <td>
+                        <span className="doc-badge" style={{ background: T.creamDeep, color: T.brownWarm }}>
+                          {a.category}
+                        </span>
+                      </td>
+                      <td>
+                        {a.mediaType === 'video' ? '🎬 Video'
+                         : a.mediaType === 'image' ? '🖼️ Image'
+                         : a.imageUrl ? '🔗 URL'
+                         : '—'}
+                      </td>
+                      <td style={{ fontSize: 12.5, color: T.brownPale }}>
+                        {fmtDate(a.publishedAt)}
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '.5rem' }}>
+                          <button className="btn btn-outline-dark btn-sm" onClick={() => startEdit(a)}>
+                            Edit
+                          </button>
+                          <button
+                            className="btn btn-sm"
+                            style={{ border: '1.5px solid #fca5a5', color: '#b91c1c', background: 'none', borderRadius: 3, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase', fontSize: 11 }}
+                            onClick={() => remove(a)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {/* Mobile: stacked cards (no horizontal scroll) */}
+              <div className="admin-news-cards-mobile">
                 {articles.map(a => (
-                  <tr key={a.id}>
-                    <td>
-                      <div style={{ fontWeight: 500, color: T.brownDeep, fontSize: 13.5 }}>{a.title}</div>
-                      <div style={{ fontSize: 11, color: T.brownPale, marginTop: 2 }}>
-                        {a.excerpt?.slice(0, 80)}…
-                      </div>
-                    </td>
-                    <td>
+                  <div key={a.id} className="admin-news-card">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: '.5rem' }}>
                       <span className="doc-badge" style={{ background: T.creamDeep, color: T.brownWarm }}>
                         {a.category}
                       </span>
-                    </td>
-                    <td>
-                      {a.mediaType === 'video' ? '🎬 Video'
-                       : a.mediaType === 'image' ? '🖼️ Image'
-                       : a.imageUrl ? '🔗 URL'
-                       : '—'}
-                    </td>
-                    <td style={{ fontSize: 12.5, color: T.brownPale }}>
-                      {fmtDate(a.publishedAt)}
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '.5rem' }}>
-                        <button className="btn btn-outline-dark btn-sm" onClick={() => startEdit(a)}>
-                          Edit
-                        </button>
-                        <button
-                          className="btn btn-sm"
-                          style={{ border: '1.5px solid #fca5a5', color: '#b91c1c', background: 'none', borderRadius: 3, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase', fontSize: 11 }}
-                          onClick={() => remove(a)}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                      <span style={{ fontSize: 11, color: T.brownPale }}>
+                        {a.mediaType === 'video' ? '🎬 Video'
+                         : a.mediaType === 'image' ? '🖼️ Image'
+                         : a.imageUrl ? '🔗 URL'
+                         : '—'}
+                      </span>
+                      <span style={{ fontSize: 11, color: T.brownPale, marginLeft: 'auto' }}>
+                        {fmtDate(a.publishedAt)}
+                      </span>
+                    </div>
+
+                    <div style={{ fontWeight: 600, color: T.brownDeep, fontSize: 14, lineHeight: 1.35, marginBottom: '.35rem' }}>
+                      {a.title}
+                    </div>
+                    <div style={{ fontSize: 12.5, color: T.textMid, lineHeight: 1.55, marginBottom: '.8rem' }}>
+                      {a.excerpt}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '.5rem' }}>
+                      <button className="btn btn-outline-dark btn-sm" onClick={() => startEdit(a)}>
+                        Edit
+                      </button>
+                      <button
+                        className="btn btn-sm"
+                        style={{ border: '1.5px solid #fca5a5', color: '#b91c1c', background: 'none', borderRadius: 3, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase', fontSize: 11 }}
+                        onClick={() => remove(a)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </>
           )}
         </div>
       </div>

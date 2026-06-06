@@ -833,14 +833,16 @@ img, video { max-width: 100%; height: auto; }
   z-index: 199;
   animation: fadeIn 0.2s ease;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .mobile-menu-content {
-  padding: 1.5rem 1.5rem 4rem;
+  padding: 1rem 1.5rem 2.5rem;
   display: flex; flex-direction: column;
+  min-height: 100%;
 }
 .mobile-menu-link {
   display: block;
-  padding: 1.1rem 0.4rem;
+  padding: 0.85rem 0.4rem;
   font-size: 0.95rem;
   font-weight: 500;
   letter-spacing: 0.13em;
@@ -867,10 +869,28 @@ img, video { max-width: 100%; height: auto; }
   border-radius: 4px;
   margin-top: 0.4rem;
   border-bottom: none;
-  padding: 1.1rem 1rem;
+  padding: 0.9rem 1rem;
   font-weight: 700;
 }
 .mobile-menu-link.mobile-menu-cta:hover { background: #E2C06A; color: #1E0F08; }
+
+/* ── Admin News responsive list (table on desktop, cards on mobile) ─── */
+.admin-news-cards-mobile { display: none; }
+.admin-news-card {
+  padding: 1rem 1.1rem;
+  border-bottom: 1px solid rgba(122, 58, 24, 0.07);
+}
+.admin-news-card:last-child { border-bottom: none; }
+@media (max-width: 768px) {
+  .admin-news-table-desktop { display: none; }
+  .admin-news-cards-mobile  { display: block; }
+}
+
+/* ── Sidebar layout — keep Sign Out pinned at the bottom ─────────────── */
+.sidebar { display: flex; flex-direction: column; }
+.sidebar-user   { flex-shrink: 0; }
+.sidebar-nav    { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.sidebar-footer { flex-shrink: 0; background: #1E0F08; }
 
 /* ── Portal sidebar mobile drawer ─────────────────────────────────────── */
 .portal-hamburger {

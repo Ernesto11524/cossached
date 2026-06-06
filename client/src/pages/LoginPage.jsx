@@ -71,7 +71,7 @@ export default function LoginPage() {
       if (!r1.ok) throw new Error(data1.error || 'Biometric sign-in not available for this account.')
 
       // 2. Browser unlocks credential (fingerprint, face, etc.)
-      const response = await startAuthentication({ optionsJSON: data1.options })
+      const response = await startAuthentication(data1.options)
 
       // 3. Server verifies + issues JWT cookie
       const r2 = await fetch('/api/webauthn/login-verify', {

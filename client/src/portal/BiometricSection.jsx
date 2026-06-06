@@ -29,7 +29,7 @@ export default function BiometricSection() {
     setEnrolling(true)
     try {
       const options = await api.post('/webauthn/register-options', {})
-      const response = await startRegistration({ optionsJSON: options })
+      const response = await startRegistration(options)
       await api.post('/webauthn/register-verify', {
         response,
         deviceName: navigator.platform || 'This device',
