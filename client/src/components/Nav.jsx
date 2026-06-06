@@ -45,7 +45,7 @@ export default function Nav() {
 
           {user ? (
             <>
-              <li>
+              <li className="nav-hide-mobile">
                 <Link to="/portal" className="nav-portal-btn btn">
                   My Portal
                 </Link>
@@ -69,7 +69,7 @@ export default function Nav() {
               </li>
             </>
           ) : (
-            <li>
+            <li className="nav-hide-mobile">
               <Link to="/login" className="nav-portal-btn btn">
                 Login
               </Link>
@@ -103,14 +103,26 @@ export default function Nav() {
                 {label}
               </Link>
             ))}
-            {user && (
-              <button
-                type="button"
-                onClick={() => { logout(); setMobileOpen(false) }}
-                className="mobile-menu-link"
-              >
-                Sign Out
-              </button>
+
+            <div style={{ height: '1.2rem' }} />
+
+            {user ? (
+              <>
+                <Link to="/portal" className="mobile-menu-link mobile-menu-cta">
+                  My Portal
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => { logout(); setMobileOpen(false) }}
+                  className="mobile-menu-link"
+                >
+                  Sign Out
+                </button>
+              </>
+            ) : (
+              <Link to="/login" className="mobile-menu-link mobile-menu-cta">
+                Member Login →
+              </Link>
             )}
           </div>
         </div>

@@ -114,7 +114,7 @@ export default function AboutPage() {
             className="reveal"
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
               gap: '1.2rem',
             }}
           >
