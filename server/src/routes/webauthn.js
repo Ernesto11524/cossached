@@ -1,0 +1,282 @@
+import { Router } from 'express'
+import jwt from 'jsonwebtoken'
+import { z } from 'zod'
+import {
+  generateRegistrationOptions,
+  verifyRegistrationResponse,
+  generateAuthenticationOptions,
+  verifyAuthenticationResponse,
+} from '@simplewebauthn/server'
+import { prisma } from '../lib/prisma.js'
+import { requireAuth } from '../middleware/requireAuth.js'
+import { loginLimiter } from '../middleware/rateLimiter.js'
+
+const router = Router()
+
+const RP_ID   = process.env.WEBAUTHN_RP_ID   || 'localhost'
+const RP_NAME = process.env.WEBAUTHN_RP_NAME || 'COSSA-CHED'
+const ORIGINS = (process.env.WEBAUTHN_ORIGIN || 'http://localhost:5173,http://localhost:5174')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean)
+
+function cookieOpts() {
+  return {
+    httpOnly: true,
+    secure:   process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge:   7 * 24 * 60 * 60 * 1000,
+    path:     '/',
+  }
+}
+
+function signToken(user) {
+  return jwt.sign(
+    { sub: user.id, role: user.role },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+  )
+}
+
+// Strip sensitive fields before returning user
+const safeSelect = {
+  id: true, staffId: true, email: true, name: true, role: true,
+  department: true, position: true, phone: true, active: true,
+  avatarFilename: true,
+}
+
+// ── Helper: convert a base64url string ↔ Buffer ──────────────────────────
+const fromB64url = (s) => Buffer.from(s, 'base64url')
+const toB64url   = (b) => Buffer.from(b).toString('base64url')
+
+// ── REGISTRATION (authenticated) ──────────────────────────────────────────
+
+// POST /api/webauthn/register-options
+router.post('/register-options', requireAuth, async (req, res) => {
+  const user = await prisma.user.findUnique({
+    where:  { id: req.user.sub },
+    include: { authenticators: true },
+  })
+
+  const options = await generateRegistrationOptions({
+    rpName:                RP_NAME,
+    rpID:                  RP_ID,
+    userID:                Buffer.from(user.id),
+    userName:              user.email,
+    userDisplayName:       user.name,
+    attestationType:       'none',
+    excludeCredentials:    user.authenticators.map(a => ({
+      id:         a.credentialId,
+      transports: a.transports?.split(',').filter(Boolean) ?? undefined,
+    })),
+    authenticatorSelection: {
+      residentKey:        'preferred',
+      userVerification:   'preferred',
+    },
+  })
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data:  { currentChallenge: options.challenge },
+  })
+
+  res.json(options)
+})
+
+// POST /api/webauthn/register-verify
+router.post('/register-verify', requireAuth, async (req, res) => {
+  const schema = z.object({
+    response:   z.any(), // raw response from @simplewebauthn/browser
+    deviceName: z.string().max(100).optional(),
+  })
+  const parse = schema.safeParse(req.body)
+  if (!parse.success) return res.status(400).json({ error: 'Invalid registration response.' })
+
+  const user = await prisma.user.findUnique({ where: { id: req.user.sub } })
+  if (!user?.currentChallenge) {
+    return res.status(400).json({ error: 'No registration in progress. Try again.' })
+  }
+
+  try {
+    const verification = await verifyRegistrationResponse({
+      response:           parse.data.response,
+      expectedChallenge:  user.currentChallenge,
+      expectedOrigin:     ORIGINS,
+      expectedRPID:       RP_ID,
+    })
+
+    if (!verification.verified || !verification.registrationInfo) {
+      return res.status(400).json({ error: 'Registration could not be verified.' })
+    }
+
+    const info = verification.registrationInfo
+    // @simplewebauthn v10 shape: { credential: { id, publicKey, counter, transports? } }
+    const credential = info.credential
+    const credentialID  = typeof credential.id === 'string' ? credential.id : toB64url(credential.id)
+    const credentialPK  = credential.publicKey
+    const counter       = BigInt(credential.counter ?? 0)
+    const transports    = (credential.transports || parse.data.response?.response?.transports || []).join(',') || null
+
+    await prisma.authenticator.create({
+      data: {
+        userId:       user.id,
+        credentialId: credentialID,
+        publicKey:    Buffer.from(credentialPK),
+        counter,
+        transports,
+        deviceName:   parse.data.deviceName || guessDeviceName(req),
+      },
+    })
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data:  { currentChallenge: null },
+    })
+
+    res.json({ ok: true })
+  } catch (err) {
+    console.error('[webauthn] register-verify error:', err.message)
+    res.status(400).json({ error: 'Could not register this device. Please try again.' })
+  }
+})
+
+// ── AUTHENTICATION (login) — public ───────────────────────────────────────
+
+// POST /api/webauthn/login-options
+router.post('/login-options', loginLimiter, async (req, res) => {
+  const schema = z.object({ staffId: z.string().min(1) })
+  const parse  = schema.safeParse(req.body)
+  if (!parse.success) return res.status(400).json({ error: 'Staff ID required.' })
+
+  const user = await prisma.user.findFirst({
+    where: {
+      OR:    [{ staffId: parse.data.staffId }, { email: parse.data.staffId }],
+      active: true,
+    },
+    include: { authenticators: true },
+  })
+
+  if (!user || user.authenticators.length === 0) {
+    return res.status(404).json({ error: 'No biometric login is set up for this account.' })
+  }
+
+  const options = await generateAuthenticationOptions({
+    rpID:               RP_ID,
+    userVerification:   'preferred',
+    allowCredentials:   user.authenticators.map(a => ({
+      id:         a.credentialId,
+      transports: a.transports?.split(',').filter(Boolean) ?? undefined,
+    })),
+  })
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data:  { currentChallenge: options.challenge },
+  })
+
+  // Echo back a session hint so the verify call knows which user
+  res.json({ options, userId: user.id })
+})
+
+// POST /api/webauthn/login-verify
+router.post('/login-verify', loginLimiter, async (req, res) => {
+  const schema = z.object({
+    userId:   z.string().min(1),
+    response: z.any(),
+  })
+  const parse = schema.safeParse(req.body)
+  if (!parse.success) return res.status(400).json({ error: 'Invalid authentication response.' })
+
+  const user = await prisma.user.findUnique({
+    where:   { id: parse.data.userId },
+    include: { authenticators: true },
+  })
+  if (!user || !user.currentChallenge || !user.active) {
+    return res.status(400).json({ error: 'No active sign-in in progress.' })
+  }
+
+  // Find the authenticator the browser used
+  const credentialId = parse.data.response?.id
+  const authenticator = user.authenticators.find(a => a.credentialId === credentialId)
+  if (!authenticator) {
+    return res.status(400).json({ error: 'Unknown authenticator.' })
+  }
+
+  try {
+    const verification = await verifyAuthenticationResponse({
+      response:          parse.data.response,
+      expectedChallenge: user.currentChallenge,
+      expectedOrigin:    ORIGINS,
+      expectedRPID:      RP_ID,
+      credential: {
+        id:         authenticator.credentialId,
+        publicKey:  authenticator.publicKey,
+        counter:    Number(authenticator.counter),
+        transports: authenticator.transports?.split(',').filter(Boolean) ?? undefined,
+      },
+    })
+
+    if (!verification.verified) {
+      return res.status(401).json({ error: 'Biometric sign-in failed.' })
+    }
+
+    // Update counter to prevent replay attacks
+    await prisma.authenticator.update({
+      where: { id: authenticator.id },
+      data:  { counter: BigInt(verification.authenticationInfo.newCounter) },
+    })
+    await prisma.user.update({
+      where: { id: user.id },
+      data:  { currentChallenge: null },
+    })
+
+    // Issue JWT cookie
+    const token = signToken(user)
+    res.cookie('token', token, cookieOpts())
+
+    // Return safe user
+    const safeUser = await prisma.user.findUnique({
+      where:  { id: user.id },
+      select: safeSelect,
+    })
+    res.json({ user: safeUser })
+  } catch (err) {
+    console.error('[webauthn] login-verify error:', err.message)
+    res.status(400).json({ error: 'Biometric sign-in could not be verified.' })
+  }
+})
+
+// ── AUTHENTICATOR MANAGEMENT (authenticated) ──────────────────────────────
+
+// GET /api/webauthn/authenticators
+router.get('/authenticators', requireAuth, async (req, res) => {
+  const list = await prisma.authenticator.findMany({
+    where:   { userId: req.user.sub },
+    select:  { id: true, deviceName: true, createdAt: true, transports: true },
+    orderBy: { createdAt: 'desc' },
+  })
+  res.json({ authenticators: list })
+})
+
+// DELETE /api/webauthn/authenticators/:id
+router.delete('/authenticators/:id', requireAuth, async (req, res) => {
+  const auth = await prisma.authenticator.findUnique({ where: { id: req.params.id } })
+  if (!auth || auth.userId !== req.user.sub) {
+    return res.status(404).json({ error: 'Authenticator not found.' })
+  }
+  await prisma.authenticator.delete({ where: { id: req.params.id } })
+  res.json({ ok: true })
+})
+
+// Best-effort device name from User-Agent
+function guessDeviceName(req) {
+  const ua = req.headers['user-agent'] || ''
+  if (/Windows/i.test(ua))  return 'Windows device'
+  if (/Mac OS|Macintosh/i.test(ua)) return 'Mac'
+  if (/iPhone/i.test(ua))   return 'iPhone'
+  if (/iPad/i.test(ua))     return 'iPad'
+  if (/Android/i.test(ua))  return 'Android device'
+  return 'Unknown device'
+}
+
+export default router

@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build output
+client/dist/
+
+# Environment secrets — never commit
+server/.env
+
+# OS / editor artefacts
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Uploaded files — keep the folder, ignore its contents
+server/uploads/*
+!server/uploads/.gitkeep
+
+# Logs
+*.log
+npm-debug.log*
+
+# PM2
+.pm2/

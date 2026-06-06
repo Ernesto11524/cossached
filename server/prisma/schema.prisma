@@ -1,0 +1,210 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Enums ──────────────────────────────────────────────────────────────────────
+
+enum Role {
+  MEMBER
+  ADMIN
+}
+
+enum WelfareStatus {
+  PENDING
+  APPROVED
+  DISBURSED
+  REJECTED
+}
+
+// ── Models ─────────────────────────────────────────────────────────────────────
+
+model User {
+  id               String   @id @default(cuid())
+  staffId          String   @unique
+  email            String   @unique
+  name             String
+  role             Role     @default(MEMBER)
+  department       String?
+  position         String?
+  phone            String?
+  avatarFilename   String?
+  positionScope    String?  // null | "NATIONAL" | "REGIONAL"
+  region           String?  // one of Ghana's 16 regions when positionScope == REGIONAL
+  passwordHash     String
+  active           Boolean  @default(true)
+  currentChallenge String?  // transient — used during WebAuthn enrol/login
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  announcements              Announcement[]
+  documents                  Document[]
+  welfareRequests            WelfareRequest[]
+  events                     Event[]
+  newsArticles               NewsArticle[]
+  conversationParticipations ConversationParticipant[]
+  sentMessages               Message[]
+  authenticators             Authenticator[]
+  notifications              Notification[]
+  passwordResetTokens        PasswordResetToken[]
+}
+
+model Conversation {
+  id            String   @id @default(cuid())
+  isGroup       Boolean  @default(false)
+  name          String?  // null for 1:1; required for groups
+  lastMessageAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  participants ConversationParticipant[]
+  messages     Message[]
+}
+
+model ConversationParticipant {
+  id             String   @id @default(cuid())
+  conversationId String
+  userId         String
+  joinedAt       DateTime @default(now())
+  lastReadAt     DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  senderId       String
+  body           String
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderId], references: [id])
+
+  @@index([conversationId, createdAt])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // "message" | "announcement" | "event" | "resource" | "welfare" | "system"
+  title     String
+  body      String?
+  link      String?  // optional tab/page anchor (e.g. "messages", "welfare", "announce")
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read, createdAt])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique  // SHA-256 hash of the raw token (raw token never stored)
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Authenticator {
+  id           String   @id @default(cuid())
+  userId       String
+  credentialId String   @unique
+  publicKey    Bytes
+  counter      BigInt
+  transports   String?  // comma-separated: usb,ble,nfc,internal,hybrid
+  deviceName   String?
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model NewsArticle {
+  id            String   @id @default(cuid())
+  title         String
+  excerpt       String
+  body          String
+  category      String
+  imageUrl      String?  // legacy / external image URL fallback
+  mediaFilename String?  // uploaded file on disk
+  mediaType     String?  // "image" | "video"
+  publishedAt   DateTime @default(now())
+  authorId      String
+  author        User     @relation(fields: [authorId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Announcement {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  category  String
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Document {
+  id           String   @id @default(cuid())
+  name         String
+  filename     String   // name on disk (UUID-based, safe for filesystem)
+  originalName String   // user-supplied filename for display
+  mimeType     String
+  mediaType    String   @default("document") // "document" | "image" | "video" | "other"
+  sizeBytes    Int
+  category     String
+  uploadedById String
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  uploadedAt   DateTime @default(now())
+
+  @@index([mediaType])
+}
+
+model WelfareRequest {
+  id          String        @id @default(cuid())
+  type        String
+  description String
+  amountGhs   Decimal?      @db.Decimal(10, 2)
+  status      WelfareStatus @default(PENDING)
+  reviewNote  String?       // admin can leave a note when reviewing
+  memberId    String
+  member      User          @relation(fields: [memberId], references: [id])
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model Event {
+  id          String   @id @default(cuid())
+  title       String
+  location    String
+  eventDate   DateTime
+  type        String
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  firstName String
+  lastName  String
+  email     String
+  subject   String
+  message   String
+  createdAt DateTime @default(now())
+}
