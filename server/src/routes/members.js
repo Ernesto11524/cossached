@@ -59,6 +59,20 @@ function welcomeSms(firstName, staffId, password, origin) {
 }
 
 const router = Router()
+
+// ── PUBLIC: executives roster for the About page (no auth) ───────────────
+router.get('/public-executives', async (_req, res) => {
+  const execs = await prisma.user.findMany({
+    where:  { active: true, positionScope: { not: null } },
+    select: {
+      id: true, name: true, position: true, positionScope: true,
+      region: true, department: true, avatarFilename: true,
+    },
+    orderBy: [{ name: 'asc' }],
+  })
+  res.json({ executives: execs })
+})
+
 router.use(requireAuth)
 
 // Keep in sync with client/src/data/regions.js

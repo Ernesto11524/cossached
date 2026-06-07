@@ -496,7 +496,9 @@ function ElectionDetailPage({ electionId, onBack, onChanged }) {
             results={results?.results?.find(r => r.id === pos.id)}
             totalBallots={results?.totalBallots}
             eligibleMembers={eligibleMembers}
-            existingCandidateUserIds={new Set(pos.candidates.map(c => c.userId).filter(Boolean))}
+            existingCandidateUserIds={new Set(
+              election.positions.flatMap(p => p.candidates.map(c => c.userId).filter(Boolean))
+            )}
             onAddCandidate={async (payload) => {
               try {
                 await api.post(`/elections/positions/${pos.id}/candidates`, payload)
@@ -735,7 +737,7 @@ function CandidateNameInput({ value, onChange, eligibleMembers, excludeUserIds, 
           borderRadius: 6, padding: '.6rem .8rem', boxShadow: '0 10px 24px rgba(30,15,8,.12)', zIndex: 30,
           fontSize: 12, color: T.brownPale,
         }}>
-          No eligible members match "{value}". You can still type a custom name above.
+          No eligible members match "{value}" (members already running for another position in this election are hidden). You can still type a custom name above.
         </div>
       )}
     </div>

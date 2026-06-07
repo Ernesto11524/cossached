@@ -293,6 +293,19 @@ router.post('/positions/:id/candidates', requireAdmin, async (req, res) => {
     return res.status(400).json({ error: "Voting has started — candidates are now locked." })
   }
 
+  // One person cannot be a candidate for more than one position in the same election.
+  if (parse.data.userId) {
+    const dup = await prisma.candidate.findFirst({
+      where:   { userId: parse.data.userId, position: { electionId: position.electionId } },
+      include: { position: { select: { title: true } } },
+    })
+    if (dup) {
+      return res.status(400).json({
+        error: `This person is already a candidate for "${dup.position.title}" in this election.`,
+      })
+    }
+  }
+
   const order = position.candidates.length
   const candidate = await prisma.candidate.create({
     data: {
