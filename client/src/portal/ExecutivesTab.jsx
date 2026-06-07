@@ -152,11 +152,11 @@ function SectionHeader({ title, subtitle }) {
 function ExecCard({ member }) {
   return (
     <div className="member-card">
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '.9rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
         <Avatar
           name={member.name}
           avatarFilename={member.avatarFilename}
-          size={75}
+          size={100}
           border="3px solid rgba(201,168,76,0.35)"
         />
       </div>

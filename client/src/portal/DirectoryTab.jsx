@@ -143,12 +143,12 @@ function MemberCard({ member: m }) {
   const isExec = !!m.positionScope
   return (
     <div className="member-card">
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '.9rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
         <Avatar
           name={m.name}
           avatarFilename={m.avatarFilename}
-          size={70}
-          border={isExec ? `3px solid ${T.gold}` : '3px solid rgba(201,168,76,0.3)'}
+          size={110}
+          border={isExec ? `4px solid ${T.gold}` : '4px solid rgba(201,168,76,0.35)'}
         />
       </div>
       <h4>{m.name}</h4>
