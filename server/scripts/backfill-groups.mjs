@@ -1,39 +1,41 @@
-// One-shot backfill — creates the national + 16 regional group chats and
-// adds every existing active member to the appropriate groups.
+// One-shot backfill — creates every auto-group and adds every active member
+// to the appropriate ones. Safe to re-run.
 //
-// Safe to re-run (idempotent).
-//
-// Run from the server/ directory:
+// Run from server/ :
 //   node scripts/backfill-groups.mjs
 
-import { backfillAllGroups, GHANA_REGIONS, ensureNationalGroup, ensureRegionalGroup } from '../src/lib/auto-groups.js'
+import { backfillAllGroups } from '../src/lib/auto-groups.js'
 import { prisma } from '../src/lib/prisma.js'
 
 const main = async () => {
-  console.log('Creating national group…')
-  await ensureNationalGroup()
-
-  console.log('Creating 16 regional groups…')
-  for (const region of GHANA_REGIONS) {
-    await ensureRegionalGroup(region)
-  }
-
-  console.log('Adding every active member to their groups…')
+  console.log('Backfilling groups…\n')
   await backfillAllGroups()
 
-  const conv = await prisma.conversation.findMany({
-    where:  { kind: { not: null } },
+  const convs = await prisma.conversation.findMany({
+    where:   { kind: { not: null } },
     include: { _count: { select: { participants: true } } },
-    orderBy: { kind: 'asc' },
+    orderBy: [{ kind: 'asc' }, { region: 'asc' }],
   })
 
-  console.log('')
-  console.log('=== Groups now in place ===')
-  for (const c of conv) {
-    const label = c.kind === 'NATIONAL' ? 'National' : `${c.region}`
-    console.log(`  ${label.padEnd(20)} → ${c._count.participants} member(s)`)
+  const groupBy = {
+    NATIONAL:             '🇬🇭 National',
+    REGIONAL:             '📍 Regional',
+    ALL_EXECUTIVES:       '⭐ All Executives',
+    NATIONAL_EXECUTIVES:  '⭐ National Executives',
+    REGIONAL_EXECUTIVES:  '⭐ Regional Executives',
   }
-  console.log('')
+
+  console.log('=== Groups now in place ===')
+  for (const kind of Object.keys(groupBy)) {
+    const inKind = convs.filter(c => c.kind === kind)
+    if (!inKind.length) continue
+    console.log(`\n${groupBy[kind]}:`)
+    for (const c of inKind) {
+      const label = c.region || c.name
+      console.log(`  ${label.padEnd(22)} → ${c._count.participants} member(s)`)
+    }
+  }
+  console.log(`\nTotal: ${convs.length} auto-groups.`)
   console.log('Done.')
 }
 
