@@ -991,8 +991,21 @@ img, video { max-width: 100%; height: auto; }
   .hero-stats { flex-direction: row; flex-wrap: wrap; gap: 1.5rem; }
   .hero-stat-num { font-size: 1.8rem; }
   .form-group + .form-group { margin-top: 0; }
-  /* Stack any two-column form grids */
-  form > div[style*="grid-template-columns: 1fr 1fr"] { grid-template-columns: 1fr !important; }
+}
+
+/* ── Stack inline grids on phones ────────────────────────────────────────
+   React inline styles can't be overridden by CSS without !important.
+   These rules catch every two-column grid laid out via inline style
+   (gridTemplateColumns="1fr 1fr" / "1fr 1.x fr") and stack them on
+   small screens, with a compact gap so things don't sprawl. */
+@media (max-width: 768px) {
+  div[style*="grid-template-columns: 1fr 1fr"],
+  div[style*="grid-template-columns: 1fr 1.1fr"],
+  div[style*="grid-template-columns: 1fr 1.4fr"] {
+    grid-template-columns: 1fr !important;
+    gap: 1.5rem !important;
+    align-items: stretch !important;
+  }
 }
 
 @media (max-width: 480px) {

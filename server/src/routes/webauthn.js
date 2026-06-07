@@ -110,20 +110,32 @@ router.post('/register-verify', requireAuth, async (req, res) => {
     }
 
     const info = verification.registrationInfo
-    // @simplewebauthn v10 shape: { credential: { id, publicKey, counter, transports? } }
-    const credential = info.credential
-    const credentialID  = typeof credential.id === 'string' ? credential.id : toB64url(credential.id)
-    const credentialPK  = credential.publicKey
-    const counter       = BigInt(credential.counter ?? 0)
-    const transports    = (credential.transports || parse.data.response?.response?.transports || []).join(',') || null
+    // Defensive: handle both v10 (credentialID/credentialPublicKey at top level)
+    // and v11 (credential: { id, publicKey, ... }) shapes.
+    const credentialIDRaw = info.credential?.id        ?? info.credentialID
+    const credentialPKRaw = info.credential?.publicKey ?? info.credentialPublicKey
+    const counterRaw      = info.credential?.counter   ?? info.counter ?? 0
+    const sdkTransports   = info.credential?.transports
+                         ?? parse.data.response?.response?.transports
+                         ?? []
+
+    if (!credentialIDRaw || !credentialPKRaw) {
+      console.error('[webauthn] Unexpected registrationInfo shape:', Object.keys(info))
+      return res.status(400).json({ error: 'Could not register this device (server SDK shape mismatch).' })
+    }
+
+    // Normalise credentialID to a base64url string for storage
+    const credentialID = typeof credentialIDRaw === 'string'
+      ? credentialIDRaw
+      : Buffer.from(credentialIDRaw).toString('base64url')
 
     await prisma.authenticator.create({
       data: {
         userId:       user.id,
         credentialId: credentialID,
-        publicKey:    Buffer.from(credentialPK),
-        counter,
-        transports,
+        publicKey:    Buffer.from(credentialPKRaw),
+        counter:      BigInt(counterRaw),
+        transports:   sdkTransports.join(',') || null,
         deviceName:   parse.data.deviceName || guessDeviceName(req),
       },
     })
@@ -203,16 +215,27 @@ router.post('/login-verify', loginLimiter, async (req, res) => {
   }
 
   try {
+    const transports = authenticator.transports?.split(',').filter(Boolean) ?? undefined
+    const credentialIDBuf = Buffer.from(authenticator.credentialId, 'base64url')
+
     const verification = await verifyAuthenticationResponse({
       response:          parse.data.response,
       expectedChallenge: user.currentChallenge,
       expectedOrigin:    ORIGINS,
       expectedRPID:      RP_ID,
+      // v10 SDK shape — pass via `authenticator`
+      authenticator: {
+        credentialID:        credentialIDBuf,
+        credentialPublicKey: authenticator.publicKey,
+        counter:             Number(authenticator.counter),
+        transports,
+      },
+      // v11 SDK shape — also include `credential` so either version works
       credential: {
         id:         authenticator.credentialId,
         publicKey:  authenticator.publicKey,
         counter:    Number(authenticator.counter),
-        transports: authenticator.transports?.split(',').filter(Boolean) ?? undefined,
+        transports,
       },
     })
 
