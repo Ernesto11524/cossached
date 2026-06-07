@@ -70,7 +70,9 @@ router.post('/register-options', requireAuth, async (req, res) => {
       transports: a.transports?.split(',').filter(Boolean) ?? undefined,
     })),
     authenticatorSelection: {
-      residentKey:        'preferred',
+      // Force a discoverable credential so the user doesn't need to type
+      // their Staff ID at sign-in time — the browser remembers them.
+      residentKey:        'required',
       userVerification:   'preferred',
     },
   })
@@ -154,6 +156,28 @@ router.post('/register-verify', requireAuth, async (req, res) => {
 
 // ── AUTHENTICATION (login) — public ───────────────────────────────────────
 
+// POST /api/webauthn/discoverable-login-options
+// No Staff ID required — the browser uses the on-device passkey to identify
+// the user. The challenge is stashed in a short-lived httpOnly cookie so the
+// subsequent verify call can validate against it.
+router.post('/discoverable-login-options', loginLimiter, async (req, res) => {
+  const options = await generateAuthenticationOptions({
+    rpID:             RP_ID,
+    userVerification: 'preferred',
+    // allowCredentials omitted → browser offers any passkey for this site
+  })
+
+  res.cookie('webauthn_challenge', options.challenge, {
+    httpOnly: true,
+    secure:   process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge:   5 * 60 * 1000, // 5 minutes
+    path:     '/',
+  })
+
+  res.json(options)
+})
+
 // POST /api/webauthn/login-options
 router.post('/login-options', loginLimiter, async (req, res) => {
   const schema = z.object({ staffId: z.string().min(1) })
@@ -191,20 +215,50 @@ router.post('/login-options', loginLimiter, async (req, res) => {
 })
 
 // POST /api/webauthn/login-verify
+//   - Staff-ID-first flow:  body = { userId, response }  → challenge from user.currentChallenge
+//   - Discoverable flow:    body = { response }          → challenge from cookie, user from credential
 router.post('/login-verify', loginLimiter, async (req, res) => {
   const schema = z.object({
-    userId:   z.string().min(1),
+    userId:   z.string().min(1).optional(),
     response: z.any(),
   })
   const parse = schema.safeParse(req.body)
   if (!parse.success) return res.status(400).json({ error: 'Invalid authentication response.' })
 
-  const user = await prisma.user.findUnique({
-    where:   { id: parse.data.userId },
-    include: { authenticators: true },
-  })
-  if (!user || !user.currentChallenge || !user.active) {
-    return res.status(400).json({ error: 'No active sign-in in progress.' })
+  let user
+  let expectedChallenge
+
+  if (parse.data.userId) {
+    // Staff-ID-first flow (existing)
+    user = await prisma.user.findUnique({
+      where:   { id: parse.data.userId },
+      include: { authenticators: true },
+    })
+    expectedChallenge = user?.currentChallenge
+  } else {
+    // Discoverable flow — identify the user from the userHandle in the response
+    const userHandle = parse.data.response?.response?.userHandle
+    if (!userHandle) {
+      return res.status(400).json({ error: 'Authentication response is missing user information.' })
+    }
+    let userId
+    try {
+      userId = Buffer.from(userHandle, 'base64url').toString('utf8')
+    } catch {
+      return res.status(400).json({ error: 'Could not decode user information from the authenticator.' })
+    }
+    user = await prisma.user.findUnique({
+      where:   { id: userId },
+      include: { authenticators: true },
+    })
+    expectedChallenge = req.cookies?.webauthn_challenge
+  }
+
+  if (!user || !user.active) {
+    return res.status(400).json({ error: 'Account not found or deactivated.' })
+  }
+  if (!expectedChallenge) {
+    return res.status(400).json({ error: 'No active sign-in in progress. Please try again.' })
   }
 
   // Find the authenticator the browser used
@@ -220,7 +274,7 @@ router.post('/login-verify', loginLimiter, async (req, res) => {
 
     const verification = await verifyAuthenticationResponse({
       response:          parse.data.response,
-      expectedChallenge: user.currentChallenge,
+      expectedChallenge,
       expectedOrigin:    ORIGINS,
       expectedRPID:      RP_ID,
       // v10 SDK shape — pass via `authenticator`
@@ -252,6 +306,8 @@ router.post('/login-verify', loginLimiter, async (req, res) => {
       where: { id: user.id },
       data:  { currentChallenge: null },
     })
+    // Clear the transient discoverable challenge cookie if it was used
+    res.clearCookie('webauthn_challenge', { path: '/' })
 
     // Issue JWT cookie
     const token = signToken(user)

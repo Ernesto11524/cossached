@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import {
   startAuthentication,
   browserSupportsWebAuthn,
+  browserSupportsWebAuthnAutofill,
 } from '@simplewebauthn/browser'
 import { useAuth } from '../context/AuthContext.jsx'
 import { T } from '../styles/tokens.js'
@@ -16,17 +17,71 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [bioBusy, setBioBusy] = useState(false)
 
-  // Already authenticated — go straight to the portal
+  // If already authenticated → portal
   if (user) return <Navigate to="/portal" replace />
 
   const handleChange = (field) => (e) =>
     setForm((prev) => ({ ...prev, [field]: e.target.value }))
 
+  // ── Common: take a server auth response and complete the login ──────────
+  const completeLogin = async (response) => {
+    const r = await fetch('/api/webauthn/login-verify', {
+      method:      'POST',
+      headers:     { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body:        JSON.stringify({ response }),
+    })
+    const text = await r.text()
+    const data = text ? JSON.parse(text) : {}
+    if (!r.ok) throw new Error(data.error || 'Biometric sign-in failed.')
+    login(data.user)
+    navigate('/portal', { replace: true })
+  }
+
+  // ── Auto-trigger conditional biometric on page load ─────────────────────
+  // The browser quietly checks if there's a passkey for this site. If yes,
+  // the user gets a passkey prompt the moment they focus the Staff ID input
+  // (or immediately on some platforms). They never need to type anything.
+  useEffect(() => {
+    if (!browserSupportsWebAuthn()) return
+
+    let cancelled = false
+    let abortController
+
+    ;(async () => {
+      try {
+        const autofill = await browserSupportsWebAuthnAutofill().catch(() => false)
+        if (!autofill || cancelled) return
+
+        const r = await fetch('/api/webauthn/discoverable-login-options', {
+          method:      'POST',
+          credentials: 'include',
+        })
+        if (!r.ok || cancelled) return
+        const options = await r.json()
+
+        // mediation: 'conditional' via the SDK's useBrowserAutofill flag
+        abortController = new AbortController()
+        const response = await startAuthentication(options, /* useBrowserAutofill */ true)
+        if (cancelled) return
+        await completeLogin(response)
+      } catch (err) {
+        // Silently ignore — most common reasons: no passkey saved on this
+        // device, user dismissed the prompt, or browser doesn't support it.
+        if (err?.name && err.name !== 'NotAllowedError' && err.name !== 'AbortError') {
+          console.warn('[autofill] biometric autofill skipped:', err.message)
+        }
+      }
+    })()
+
+    return () => { cancelled = true; abortController?.abort() }
+  }, [])
+
+  // ── Password sign in ────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     setLoading(true)
-
     try {
       const res = await fetch('/api/auth/login', {
         method:      'POST',
@@ -40,9 +95,8 @@ export default function LoginPage() {
       login(data.user)
       navigate('/portal', { replace: true })
     } catch (err) {
-      // SyntaxError = empty/non-JSON body, TypeError = network unreachable
       if (err.name === 'SyntaxError' || err.name === 'TypeError') {
-        setError("Can't reach the server. Is the backend running on http://localhost:3001?")
+        setError("Can't reach the server. Please try again in a moment.")
       } else {
         setError(err.message)
       }
@@ -51,41 +105,20 @@ export default function LoginPage() {
     }
   }
 
+  // ── Explicit biometric button — passwordless, no staffId required ──────
   const handleBiometric = async () => {
     setError('')
-    if (!form.staffId.trim()) {
-      setError('Enter your Staff ID first, then tap "Sign in with biometrics".')
-      return
-    }
     setBioBusy(true)
     try {
-      // 1. Ask server for auth options + the user it identifies
-      const r1 = await fetch('/api/webauthn/login-options', {
+      const r = await fetch('/api/webauthn/discoverable-login-options', {
         method:      'POST',
-        headers:     { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body:        JSON.stringify({ staffId: form.staffId.trim() }),
       })
-      const text1 = await r1.text()
-      const data1 = text1 ? JSON.parse(text1) : {}
-      if (!r1.ok) throw new Error(data1.error || 'Biometric sign-in not available for this account.')
+      const data = r.ok ? await r.json() : await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(data.error || 'Biometric sign-in not available.')
 
-      // 2. Browser unlocks credential (fingerprint, face, etc.)
-      const response = await startAuthentication(data1.options)
-
-      // 3. Server verifies + issues JWT cookie
-      const r2 = await fetch('/api/webauthn/login-verify', {
-        method:      'POST',
-        headers:     { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body:        JSON.stringify({ userId: data1.userId, response }),
-      })
-      const text2 = await r2.text()
-      const data2 = text2 ? JSON.parse(text2) : {}
-      if (!r2.ok) throw new Error(data2.error || 'Biometric sign-in failed.')
-
-      login(data2.user)
-      navigate('/portal', { replace: true })
+      const response = await startAuthentication(data)
+      await completeLogin(response)
     } catch (err) {
       if (err.name === 'NotAllowedError' || err.name === 'AbortError') {
         setError('Biometric sign-in was cancelled.')
@@ -102,7 +135,6 @@ export default function LoginPage() {
   return (
     <div className="auth-page">
       <div className="auth-card fade-in">
-        {/* Logo */}
         <div className="auth-logo">
           <div className="auth-logo-ring">C</div>
           <div>
@@ -116,10 +148,30 @@ export default function LoginPage() {
           Sign in with your COCOBOD Staff credentials to access the member portal.
         </p>
 
-        {/* Error */}
         {error && <div className="auth-error">{error}</div>}
 
-        {/* Form */}
+        {/* Biometric — top, prominent, no staffId required */}
+        {webauthnSupported && (
+          <>
+            <button
+              type="button"
+              className="btn btn-gold"
+              style={{ width: '100%', justifyContent: 'center', marginBottom: '1.1rem' }}
+              onClick={handleBiometric}
+              disabled={loading || bioBusy}
+            >
+              {bioBusy ? 'Waiting for device…' : '🔐 Sign in with biometrics'}
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '.7rem', margin: '0 0 1.1rem' }}>
+              <div style={{ flex: 1, height: 1, background: 'rgba(122,58,24,.12)' }} />
+              <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '.1em', textTransform: 'uppercase', color: T.brownPale }}>
+                or sign in manually
+              </span>
+              <div style={{ flex: 1, height: 1, background: 'rgba(122,58,24,.12)' }} />
+            </div>
+          </>
+        )}
+
         <form onSubmit={handleSubmit} noValidate>
           <div className="form-group">
             <label className="form-label" htmlFor="staffId">Staff ID or Email</label>
@@ -129,7 +181,7 @@ export default function LoginPage() {
               placeholder="e.g. 1234567"
               value={form.staffId}
               onChange={handleChange('staffId')}
-              autoComplete="username"
+              autoComplete="username webauthn"
               required
             />
             <small style={{ display: 'block', marginTop: 4, fontSize: 11.5, color: T.brownPale }}>
@@ -161,38 +213,13 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            className="btn btn-gold"
+            className="btn btn-outline-dark"
             style={{ width: '100%', justifyContent: 'center', marginTop: '0.5rem' }}
             disabled={loading || bioBusy}
           >
             {loading ? 'Signing in…' : 'Sign In to Portal'}
           </button>
         </form>
-
-        {webauthnSupported && (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '.7rem', margin: '1.3rem 0 1rem' }}>
-              <div style={{ flex: 1, height: 1, background: 'rgba(122,58,24,.12)' }} />
-              <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '.1em', textTransform: 'uppercase', color: T.brownPale }}>
-                or
-              </span>
-              <div style={{ flex: 1, height: 1, background: 'rgba(122,58,24,.12)' }} />
-            </div>
-
-            <button
-              type="button"
-              className="btn btn-outline-dark"
-              style={{ width: '100%', justifyContent: 'center' }}
-              onClick={handleBiometric}
-              disabled={loading || bioBusy}
-            >
-              {bioBusy ? 'Waiting for device…' : '🔐 Sign in with biometrics'}
-            </button>
-            <small style={{ display: 'block', marginTop: 6, fontSize: 11, color: T.brownPale, textAlign: 'center' }}>
-              Enter your Staff ID above, then use your fingerprint, face, or device PIN.
-            </small>
-          </>
-        )}
 
         <div className="auth-divider" />
 
