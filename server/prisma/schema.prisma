@@ -51,18 +51,48 @@ model User {
   authenticators             Authenticator[]
   notifications              Notification[]
   passwordResetTokens        PasswordResetToken[]
+  galleryUploads             GalleryItem[]            @relation("GalleryUploads")
+  galleryTags                GalleryTag[]             @relation("GalleryTags")
+}
+
+model GalleryItem {
+  id            String   @id @default(cuid())
+  title         String
+  caption       String?
+  mediaFilename String
+  mediaType     String   // "image" | "video"
+  category      String?  // optional album label, e.g. "Annual Congress 2025"
+  uploadedById  String
+  uploadedBy    User     @relation("GalleryUploads", fields: [uploadedById], references: [id])
+  createdAt     DateTime @default(now())
+
+  tags GalleryTag[]
+}
+
+model GalleryTag {
+  id            String      @id @default(cuid())
+  galleryItemId String
+  userId        String
+  galleryItem   GalleryItem @relation(fields: [galleryItemId], references: [id], onDelete: Cascade)
+  user          User        @relation("GalleryTags", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([galleryItemId, userId])
 }
 
 model Conversation {
   id            String   @id @default(cuid())
   isGroup       Boolean  @default(false)
   name          String?  // null for 1:1; required for groups
+  kind          String?  // null (regular) | "NATIONAL" | "REGIONAL"
+  region        String?  // set only when kind = REGIONAL
   lastMessageAt DateTime @default(now())
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   participants ConversationParticipant[]
   messages     Message[]
+
+  @@index([kind, region])
 }
 
 model ConversationParticipant {

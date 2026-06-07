@@ -8,6 +8,7 @@ import { requireAdmin } from '../middleware/requireAdmin.js'
 import { notify } from '../lib/notifications.js'
 import { sendMail } from '../lib/mailer.js'
 import { sendSms }  from '../lib/sms.js'
+import { syncMemberGroups } from '../lib/auto-groups.js'
 
 // Generate a memorable but secure temp password: 5 chars · dash · 5 chars.
 // Skips ambiguous characters (0/O, 1/I/l) so members can read it from email
@@ -206,6 +207,9 @@ router.post('/', requireAdmin, async (req, res) => {
     throw err
   }
 
+  // Auto-add to national + regional group chats (best effort)
+  syncMemberGroups(user.id).catch(err => console.error('[members] auto-groups failed:', err.message))
+
   // ── Send welcome email + SMS (best effort — never blocks the response) ──
   const origin = process.env.CLIENT_ORIGIN?.split(',')[0]?.trim() || 'http://localhost:5173'
   const firstName = user.name.split(' ')[0]
@@ -254,6 +258,10 @@ router.patch('/:id', requireAdmin, async (req, res) => {
       department: true, position: true, positionScope: true, region: true, active: true,
     },
   })
+
+  // Re-sync group memberships in case role or region changed
+  syncMemberGroups(user.id).catch(err => console.error('[members] auto-groups failed:', err.message))
+
   res.json({ user })
 })
 

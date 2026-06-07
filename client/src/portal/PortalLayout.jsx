@@ -13,6 +13,7 @@ const MAIN_ITEMS = [
   { id: 'executives', icon: '🏛️', label: 'Executives'       },
   { id: 'directory',  icon: '👥', label: 'Member Directory' },
   { id: 'resources',  icon: '📁', label: 'Resources'        },
+  { id: 'gallery',    icon: '📸', label: 'Gallery'          },
   { id: 'welfare',    icon: '🤲', label: 'Welfare Requests' },
 ]
 
