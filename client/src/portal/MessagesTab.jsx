@@ -21,6 +21,7 @@ export default function MessagesTab() {
   const { user } = useAuth()
   const [conversations, setConversations] = useState([])
   const [activeId,      setActiveId]      = useState(null)
+  const [filter,        setFilter]        = useState('direct')   // 'direct' | 'groups'
   const [messages,      setMessages]      = useState([])
   const [draft,         setDraft]         = useState('')
   const [sending,       setSending]       = useState(false)
@@ -105,38 +106,68 @@ export default function MessagesTab() {
 
   if (loading) return <p style={{ color: T.brownPale, padding: '2rem 0' }}>Loading messages…</p>
 
+  // ── Filter conversations into two streams ──────────────────────────────
+  const direct = conversations.filter(c => !c.isGroup)
+  const groups = conversations.filter(c =>  c.isGroup)
+  const visibleList = filter === 'direct' ? direct : groups
+  const directUnread = direct.reduce((n, c) => n + (c.unreadCount || 0), 0)
+  const groupsUnread = groups.reduce((n, c) => n + (c.unreadCount || 0), 0)
+
+  const openConversation = (id) => setActiveId(id)
+  const backToList       = () => setActiveId(null)
+
   return (
     <div className="fade-in">
-      <div className="msg-layout">
+      <div className={`msg-layout ${active ? 'has-active' : ''}`}>
         {/* ── Conversation list ───────────────────────────────────────────── */}
         <div className="msg-list">
           <div className="msg-list-header">
-            <h3>Conversations</h3>
+            <h3>Messages</h3>
             <button className="btn btn-gold btn-sm" onClick={() => setShowNew(true)}>
               + New
             </button>
           </div>
 
+          {/* Direct / Groups tabs */}
+          <div className="msg-filter-tabs">
+            <button
+              type="button"
+              className={`msg-filter-tab ${filter === 'direct' ? 'active' : ''}`}
+              onClick={() => setFilter('direct')}
+            >
+              💬 Direct
+              {directUnread > 0 && <span className="msg-unread-badge" style={{ marginLeft: 6 }}>{directUnread}</span>}
+            </button>
+            <button
+              type="button"
+              className={`msg-filter-tab ${filter === 'groups' ? 'active' : ''}`}
+              onClick={() => setFilter('groups')}
+            >
+              👥 Groups
+              {groupsUnread > 0 && <span className="msg-unread-badge" style={{ marginLeft: 6 }}>{groupsUnread}</span>}
+            </button>
+          </div>
+
           <div className="msg-conversations">
-            {conversations.length === 0 ? (
+            {visibleList.length === 0 ? (
               <div style={{ padding: '1.5rem 1.2rem', textAlign: 'center', color: T.brownPale, fontSize: 13 }}>
-                No conversations yet. Click "+ New" to start one.
+                {filter === 'direct'
+                  ? 'No direct messages yet. Tap "+ New" to message a colleague.'
+                  : "You're not in any groups yet."}
               </div>
-            ) : conversations.map(c => (
+            ) : visibleList.map(c => (
               <div
                 key={c.id}
                 className={`msg-conv-item ${c.id === activeId ? 'active' : ''}`}
-                onClick={() => setActiveId(c.id)}
+                onClick={() => openConversation(c.id)}
               >
                 <Avatar
                   name={c.displayName}
                   avatarFilename={c.avatarFilename}
-                  size={40}
+                  size={42}
                 />
                 <div className="msg-conv-info">
-                  <div className="msg-conv-name">
-                    {c.isGroup ? '👥 ' : ''}{c.displayName}
-                  </div>
+                  <div className="msg-conv-name">{c.displayName}</div>
                   <div className="msg-conv-last">
                     {c.lastMessage
                       ? `${c.lastMessage.senderId === user.id ? 'You: ' : ''}${c.lastMessage.body.slice(0, 50)}`
@@ -171,6 +202,14 @@ export default function MessagesTab() {
           ) : (
             <>
               <div className="msg-thread-header">
+                <button
+                  type="button"
+                  className="msg-back-btn"
+                  onClick={backToList}
+                  aria-label="Back to conversations"
+                >
+                  ←
+                </button>
                 <Avatar
                   name={active.displayName}
                   avatarFilename={active.avatarFilename}
