@@ -14,6 +14,7 @@ const MAIN_ITEMS = [
   { id: 'directory',  icon: '👥', label: 'Member Directory' },
   { id: 'resources',  icon: '📁', label: 'Resources'        },
   { id: 'gallery',    icon: '📸', label: 'Gallery'          },
+  { id: 'elections',  icon: '🗳️', label: 'Elections'         },
   { id: 'welfare',    icon: '🤲', label: 'Welfare Requests' },
 ]
 
@@ -25,7 +26,8 @@ const PERSONAL_ITEMS = [
 const ADMIN_ITEMS = [
   { id: 'adminNews',     icon: '📰', label: 'Manage News'     },
   { id: 'adminMembers',  icon: '🛡️', label: 'Manage Members'  },
-  { id: 'adminMessages', icon: '📨', label: 'Contact Messages' },
+  { id: 'adminMessages',  icon: '📨', label: 'Contact Messages' },
+  { id: 'adminElections', icon: '🗳️', label: 'Manage Elections' },
 ]
 
 export default function PortalLayout({ title, activeTab, setTab, children }) {

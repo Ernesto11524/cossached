@@ -240,7 +240,7 @@ function ViewModal({ item, isAdmin, onClose, onDeleted }) {
 
 // ── Upload modal ──────────────────────────────────────────────────────────
 function UploadModal({ onClose, onUploaded }) {
-  const [file,     setFile]     = useState(null)
+  const [files,    setFiles]    = useState([])   // now an array — multi-file
   const [title,    setTitle]    = useState('')
   const [caption,  setCaption]  = useState('')
   const [category, setCategory] = useState('')
@@ -263,16 +263,17 @@ function UploadModal({ onClose, onUploaded }) {
     return next
   })
 
+  const removeFile = (idx) => setFiles(prev => prev.filter((_, i) => i !== idx))
+
   const submit = async (e) => {
     e.preventDefault()
-    if (!file) { setError('Please select a photo or video.'); return }
-    if (!title.trim()) { setError('Title is required.'); return }
+    if (files.length === 0) { setError('Please select at least one photo or video.'); return }
     setError('')
     setPosting(true)
     try {
       const fd = new FormData()
-      fd.append('media', file)
-      fd.append('title', title.trim())
+      files.forEach(f => fd.append('media', f))
+      if (title.trim())    fd.append('title',    title.trim())
       if (caption.trim())  fd.append('caption',  caption.trim())
       if (category.trim()) fd.append('category', category.trim())
       if (picked.size > 0) fd.append('tagIds', [...picked].join(','))
@@ -313,24 +314,64 @@ function UploadModal({ onClose, onUploaded }) {
         {error && <div className="auth-error">{error}</div>}
 
         <div className="form-group">
-          <label className="form-label">Photo or Video *</label>
+          <label className="form-label">Photos / Videos *</label>
           <input
             ref={fileRef}
             type="file"
+            multiple
             className="form-input"
             accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
-            onChange={e => setFile(e.target.files?.[0] || null)}
+            onChange={e => setFiles([...(e.target.files || [])])}
             style={{ paddingTop: 8 }}
-            required
           />
           <small style={{ fontSize: 11, color: T.brownPale, display: 'block', marginTop: 4 }}>
-            Images or videos, max 200 MB.
+            Pick one or many — up to 30 files, max 200 MB each. They'll all share the title / album / caption / tags below.
           </small>
+
+          {files.length > 0 && (
+            <div style={{ marginTop: '.6rem', padding: '.6rem', background: T.creamLight, borderRadius: 5, border: `1px solid rgba(122,58,24,.08)` }}>
+              <div style={{ fontSize: 11.5, fontWeight: 600, color: T.brownWarm, marginBottom: '.4rem' }}>
+                {files.length} file{files.length === 1 ? '' : 's'} selected
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 130, overflowY: 'auto' }}>
+                {files.map((f, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5 }}>
+                    <span style={{ color: T.brownDeep, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {f.type.startsWith('video/') ? '🎬' : '🖼️'} {f.name}
+                    </span>
+                    <span style={{ color: T.brownPale, fontSize: 10.5 }}>
+                      {(f.size / (1024 * 1024)).toFixed(1)} MB
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeFile(i)}
+                      style={{ background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', fontSize: 14, padding: 0, lineHeight: 1 }}
+                      aria-label="Remove file"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="form-group">
-          <label className="form-label">Title *</label>
-          <input className="form-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. 2026 Annual Health Walk" required />
+          <label className="form-label">
+            {files.length > 1 ? `Title (shared — items will be numbered)` : 'Title (optional)'}
+          </label>
+          <input
+            className="form-input"
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            placeholder={files.length > 1 ? 'e.g. 2026 Health Walk' : 'e.g. 2026 Annual Health Walk'}
+          />
+          {files.length > 1 && (
+            <small style={{ fontSize: 11, color: T.brownPale, display: 'block', marginTop: 4 }}>
+              Items will appear as "{title || 'Title'} (1)", "{title || 'Title'} (2)", etc. Leave blank to use each file's original name.
+            </small>
+          )}
         </div>
 
         <div className="form-group">

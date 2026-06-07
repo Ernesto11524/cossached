@@ -99,45 +99,60 @@ router.get('/:id/media', async (req, res) => {
   createReadStream(filePath).pipe(res)
 })
 
-// POST /api/gallery — upload + create (admin)
-router.post('/', requireAdmin, upload.single('media'), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'A photo or video is required.' })
+// POST /api/gallery — upload one OR MANY files at once (admin).
+// All uploaded files share the same title / caption / category / tags.
+// If a title isn't given when uploading multiple files, each item uses its
+// original filename (without extension) so they're individually findable.
+router.post('/', requireAdmin, upload.array('media', 30), async (req, res) => {
+  const files = req.files || []
+  if (files.length === 0) return res.status(400).json({ error: 'At least one photo or video is required.' })
 
   const schema = z.object({
-    title:    z.string().min(1).max(200),
+    title:    z.string().max(200).optional(),
     caption:  z.string().max(1000).optional(),
     category: z.string().max(100).optional(),
-    tagIds:   z.string().optional(), // comma-separated user ids
+    tagIds:   z.string().optional(),
   })
   const parse = schema.safeParse(req.body)
   if (!parse.success) {
-    await unlink(path.join(GALLERY_DIR, req.file.filename)).catch(() => {})
+    // Tidy up any files multer already wrote to disk
+    await Promise.all(files.map(f => unlink(path.join(GALLERY_DIR, f.filename)).catch(() => {})))
     return res.status(400).json({ error: parse.error.errors[0].message })
   }
 
   const tagIds = parse.data.tagIds
     ? parse.data.tagIds.split(',').map(s => s.trim()).filter(Boolean)
     : []
+  const sharedTitle = parse.data.title?.trim() || null
 
-  const item = await prisma.galleryItem.create({
-    data: {
-      title:         parse.data.title,
-      caption:       parse.data.caption || null,
-      category:      parse.data.category || null,
-      mediaFilename: req.file.filename,
-      mediaType:     classify(req.file.mimetype),
-      uploadedById:  req.user.sub,
-      tags: {
-        create: tagIds.map(userId => ({ userId })),
+  // Create one GalleryItem per uploaded file, all sharing the same metadata
+  const created = []
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i]
+    const fallbackTitle = path.basename(file.originalname, path.extname(file.originalname)) || `Item ${i + 1}`
+    const title = sharedTitle
+      ? (files.length > 1 ? `${sharedTitle} (${i + 1})` : sharedTitle)
+      : fallbackTitle
+
+    const item = await prisma.galleryItem.create({
+      data: {
+        title,
+        caption:       parse.data.caption || null,
+        category:      parse.data.category || null,
+        mediaFilename: file.filename,
+        mediaType:     classify(file.mimetype),
+        uploadedById:  req.user.sub,
+        tags: { create: tagIds.map(userId => ({ userId })) },
       },
-    },
-    include: {
-      uploadedBy: { select: { name: true } },
-      tags: { include: { user: { select: { id: true, name: true, avatarFilename: true } } } },
-    },
-  })
+      include: {
+        uploadedBy: { select: { name: true } },
+        tags: { include: { user: { select: { id: true, name: true, avatarFilename: true } } } },
+      },
+    })
+    created.push(shape(item))
+  }
 
-  res.status(201).json({ item: shape(item) })
+  res.status(201).json({ items: created, count: created.length })
 })
 
 // PATCH /api/gallery/:id — update title/caption/category/tags (admin)

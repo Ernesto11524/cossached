@@ -13,6 +13,8 @@ import AdminMembersTab      from '../portal/AdminMembersTab.jsx'
 import AdminNewsTab         from '../portal/AdminNewsTab.jsx'
 import ContactMessagesTab   from '../portal/ContactMessagesTab.jsx'
 import GalleryTab           from '../portal/GalleryTab.jsx'
+import ElectionsTab         from '../portal/ElectionsTab.jsx'
+import AdminElectionsTab    from '../portal/AdminElectionsTab.jsx'
 import PushPrompt           from '../components/PushPrompt.jsx'
 
 const TAB_TITLES = {
@@ -20,7 +22,9 @@ const TAB_TITLES = {
   announce:      'Announcements',
   messages:      'Messages',
   resources:     'Resources',
-  gallery:       'Gallery',
+  gallery:        'Gallery',
+  elections:      'Elections',
+  adminElections: 'Manage Elections',
   directory:     'Member Directory',
   executives:    'Executive Officers',
   welfare:       'Welfare Requests',
@@ -39,7 +43,9 @@ export default function PortalPage() {
     announce:      <AnnouncementsTab />,
     messages:      <MessagesTab />,
     resources:     <ResourcesTab />,
-    gallery:       <GalleryTab />,
+    gallery:        <GalleryTab />,
+    elections:      <ElectionsTab />,
+    adminElections: <AdminElectionsTab />,
     directory:     <DirectoryTab />,
     executives:    <ExecutivesTab />,
     welfare:       <WelfareTab />,

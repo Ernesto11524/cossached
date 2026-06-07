@@ -21,6 +21,7 @@ import webauthnRoutes      from './routes/webauthn.js'
 import notificationRoutes  from './routes/notifications.js'
 import passwordResetRoutes from './routes/password-reset.js'
 import galleryRoutes       from './routes/gallery.js'
+import electionsRoutes     from './routes/elections.js'
 
 // ── Fail fast on missing required secrets ─────────────────────────────────
 if (!process.env.JWT_SECRET) {
@@ -70,6 +71,7 @@ app.use('/api/webauthn',       webauthnRoutes)
 app.use('/api/notifications',  notificationRoutes)
 app.use('/api/password-reset', passwordResetRoutes)
 app.use('/api/gallery',        galleryRoutes)
+app.use('/api/elections',      electionsRoutes)
 
 // ── Global error handler ──────────────────────────────────────────────────
 // eslint-disable-next-line no-unused-vars

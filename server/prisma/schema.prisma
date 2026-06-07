@@ -53,6 +53,83 @@ model User {
   passwordResetTokens        PasswordResetToken[]
   galleryUploads             GalleryItem[]            @relation("GalleryUploads")
   galleryTags                GalleryTag[]             @relation("GalleryTags")
+  electionsCreated           Election[]               @relation("ElectionCreator")
+  candidacies                Candidate[]              @relation("CandidateMember")
+  ballotReceipts             BallotReceipt[]          @relation("BallotVoter")
+}
+
+// ── Elections ─────────────────────────────────────────────────────────────
+// Voting is by secret ballot — Vote rows have no voter linkage so it's
+// impossible to tell who voted for whom. BallotReceipt tracks WHO voted
+// (so we can prevent double voting and show turnout) but not WHAT.
+
+model Election {
+  id            String   @id @default(cuid())
+  title         String
+  description   String?
+  scope         String   // "NATIONAL" | "REGIONAL"
+  region        String?  // required when scope = REGIONAL
+  startsAt      DateTime
+  endsAt        DateTime
+  resultsPublic Boolean  @default(false)  // admin toggle — true = members can see results
+  createdById   String
+  createdBy     User     @relation("ElectionCreator", fields: [createdById], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  positions ElectionPosition[]
+  receipts  BallotReceipt[]
+  votes     Vote[]
+
+  @@index([scope, region])
+  @@index([startsAt, endsAt])
+}
+
+model ElectionPosition {
+  id         String   @id @default(cuid())
+  electionId String
+  title      String   // e.g., "President"
+  order      Int      @default(0)
+  election   Election @relation(fields: [electionId], references: [id], onDelete: Cascade)
+
+  candidates Candidate[]
+}
+
+model Candidate {
+  id         String   @id @default(cuid())
+  positionId String
+  name       String
+  bio        String?
+  userId     String?  // optional link to a member account
+  order      Int      @default(0)
+  position   ElectionPosition @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  user       User?            @relation("CandidateMember", fields: [userId], references: [id])
+
+  votes Vote[]
+}
+
+model BallotReceipt {
+  id         String   @id @default(cuid())
+  electionId String
+  voterId    String
+  castAt     DateTime @default(now())
+  election   Election @relation(fields: [electionId], references: [id], onDelete: Cascade)
+  voter      User     @relation("BallotVoter", fields: [voterId], references: [id])
+
+  @@unique([electionId, voterId])
+  @@index([voterId])
+}
+
+model Vote {
+  id          String   @id @default(cuid())
+  electionId  String
+  candidateId String
+  // No voter linkage — secret ballot
+  election    Election  @relation(fields: [electionId], references: [id], onDelete: Cascade)
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+  @@index([electionId])
 }
 
 model GalleryItem {
