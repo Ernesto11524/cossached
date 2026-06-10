@@ -9,6 +9,7 @@ import { notify } from '../lib/notifications.js'
 import { sendMail } from '../lib/mailer.js'
 import { sendSms }  from '../lib/sms.js'
 import { syncMemberGroups } from '../lib/auto-groups.js'
+import { ALL_EXECUTIVE_POSITIONS, scopeOfPosition } from '../lib/positions.js'
 
 // Generate a memorable but secure temp password: 5 chars · dash · 5 chars.
 // Skips ambiguous characters (0/O, 1/I/l) so members can read it from email
@@ -195,7 +196,12 @@ router.post('/', requireAdmin, async (req, res) => {
   if (!parse.success) return res.status(400).json({ error: parse.error.errors[0].message })
 
   const data = { ...parse.data }
-  if (!data.position) data.positionScope = null
+
+  // Validate position is one of the canonical options (or empty) and derive its scope.
+  if (data.position && !ALL_EXECUTIVE_POSITIONS.includes(data.position)) {
+    return res.status(400).json({ error: 'Position must be one of the recognised executive titles.' })
+  }
+  data.positionScope = data.position ? scopeOfPosition(data.position) : null
   if (data.positionScope === 'REGIONAL' && !data.region) {
     return res.status(400).json({ error: 'A regional executive needs a region — please pick one.' })
   }
@@ -258,10 +264,16 @@ router.patch('/:id', requireAdmin, async (req, res) => {
   if (!parse.success) return res.status(400).json({ error: 'Invalid update.' })
 
   const data = { ...parse.data }
-  // Clearing the position also clears the executive scope (but NOT the region —
-  // region is now everyone's home/work region, independent of any office held).
-  if (data.position === '' || data.position === null) {
-    data.positionScope = null
+
+  // If position was sent, normalise it and re-derive scope from the canonical list.
+  if (data.position !== undefined) {
+    if (data.position && !ALL_EXECUTIVE_POSITIONS.includes(data.position)) {
+      return res.status(400).json({ error: 'Position must be one of the recognised executive titles.' })
+    }
+    data.positionScope = data.position ? scopeOfPosition(data.position) : null
+  }
+  if (data.positionScope === 'REGIONAL' && data.region === null) {
+    return res.status(400).json({ error: 'A regional executive needs a region — please pick one.' })
   }
 
   const user = await prisma.user.update({

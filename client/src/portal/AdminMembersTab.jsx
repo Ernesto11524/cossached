@@ -3,6 +3,7 @@ import { api } from '../lib/api.js'
 import { T } from '../styles/tokens.js'
 import { GHANA_REGIONS } from '../data/regions.js'
 import { DEPARTMENTS } from '../data/departments.js'
+import { NATIONAL_POSITIONS, REGIONAL_POSITIONS, scopeOfPosition } from '../data/positions.js'
 
 const EMPTY_FORM = {
   staffId:       '',
@@ -55,11 +56,8 @@ export default function AdminMembersTab() {
     setFormErr('')
     setSuccessInfo(null)
 
-    // Client-side consistency check
-    if (form.position && !form.positionScope) {
-      setFormErr('Please choose whether this is a National or Regional position.')
-      return
-    }
+    // Client-side consistency check — scope is now derived from the position
+    // dropdown, but regional execs still need an explicit region.
     if (form.positionScope === 'REGIONAL' && !form.region) {
       setFormErr('Please pick a region for this regional position.')
       return
@@ -307,84 +305,44 @@ export default function AdminMembersTab() {
               </small>
             </div>
             <div className="form-group">
-              <label className="form-label">Position (optional)</label>
-              <input
-                className="form-input"
-                placeholder="e.g. President, Regional Secretary, leave blank if none"
+              <label className="form-label">Executive Position (optional)</label>
+              <select
+                className="form-select"
                 value={form.position}
                 onChange={(e) => {
-                  setForm(prev => ({
-                    ...prev,
-                    position: e.target.value,
-                    // Reset scope when the position is cleared (region stays — it's the work region)
-                    ...(e.target.value === '' ? { positionScope: '' } : {}),
-                  }))
+                  const pos   = e.target.value
+                  const scope = scopeOfPosition(pos) || ''
+                  setForm(prev => ({ ...prev, position: pos, positionScope: scope }))
                 }}
-              />
+              >
+                <option value="">— Regular member (no executive role) —</option>
+                <optgroup label="🇬🇭  National Executive">
+                  {NATIONAL_POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                </optgroup>
+                <optgroup label="📍  Regional Executive">
+                  {REGIONAL_POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                </optgroup>
+              </select>
               <small style={{ display: 'block', marginTop: 4, fontSize: 11, color: T.brownPale }}>
-                If this member holds an official COSSA-CHED position (executive role), enter the title and choose its scope below.
+                Pick the position this member holds. Leave blank for ordinary members. Regional positions require the region to be set above.
               </small>
             </div>
 
-            {/* Position scope — appears only when a position has been entered */}
-            {form.position && (
-              <>
-                <div className="form-group" style={{ gridColumn: '1/-1' }}>
-                  <label className="form-label">Position Scope *</label>
-                  <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap' }}>
-                    {[
-                      { value: 'NATIONAL', label: '🇬🇭 National Executive',   desc: 'Head office / national-level role' },
-                      { value: 'REGIONAL', label: '📍 Regional Executive', desc: 'Holds office within one region' },
-                    ].map(opt => (
-                      <label
-                        key={opt.value}
-                        style={{
-                          flex: 1, minWidth: 200,
-                          display: 'flex', alignItems: 'flex-start', gap: '.6rem',
-                          padding: '.8rem .9rem',
-                          borderRadius: 5,
-                          border: `1.5px solid ${form.positionScope === opt.value ? T.gold : 'rgba(122,58,24,.18)'}`,
-                          background: form.positionScope === opt.value ? 'rgba(201,168,76,.08)' : '#fff',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <input
-                          type="radio"
-                          name="positionScope"
-                          value={opt.value}
-                          checked={form.positionScope === opt.value}
-                          onChange={(e) => setForm(prev => ({
-                            ...prev,
-                            positionScope: e.target.value,
-                          }))}
-                          style={{ marginTop: 2 }}
-                        />
-                        <div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: T.brownDeep }}>{opt.label}</div>
-                          <div style={{ fontSize: 11, color: T.brownPale, marginTop: 2 }}>{opt.desc}</div>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Regional execs require a region — surface the reminder if missing */}
-                {form.positionScope === 'REGIONAL' && !form.region && (
-                  <div
-                    style={{
-                      gridColumn: '1/-1',
-                      padding: '.7rem .9rem',
-                      background: '#fef3c7',
-                      border: '1px solid #fcd34d',
-                      borderRadius: 5,
-                      fontSize: 12,
-                      color: '#92400e',
-                    }}
-                  >
-                    A regional executive needs a region — please pick one in the <strong>Region</strong> field above.
-                  </div>
-                )}
-              </>
+            {/* Regional execs require a region — surface the reminder if missing */}
+            {form.positionScope === 'REGIONAL' && !form.region && (
+              <div
+                style={{
+                  gridColumn: '1/-1',
+                  padding: '.7rem .9rem',
+                  background: '#fef3c7',
+                  border: '1px solid #fcd34d',
+                  borderRadius: 5,
+                  fontSize: 12,
+                  color: '#92400e',
+                }}
+              >
+                This regional position needs a region — please pick one in the <strong>Region</strong> field above.
+              </div>
             )}
             <div className="form-group">
               <label className="form-label">Phone</label>
