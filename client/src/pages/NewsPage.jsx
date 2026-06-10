@@ -136,12 +136,12 @@ export default function NewsPage() {
               return (
                 <article
                   key={article.id}
-                  className={`news-card ${i === 0 ? 'featured' : ''}`}
+                  className="news-card"
                   onClick={() => setSelected(article)}
                 >
                   <div
                     className="news-img-wrap"
-                    style={{ height: i === 0 ? 300 : 200 }}
+                    style={{ height: 220 }}
                   >
                     {article.mediaType === 'video' && article.mediaUrl ? (
                       <>
