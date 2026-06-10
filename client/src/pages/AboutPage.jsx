@@ -50,13 +50,13 @@ export default function AboutPage() {
             {/* Image */}
             <div className="about-img">
               <img
-                src="https://images.unsplash.com/photo-1574482620881-6f2a6c9a98a2?w=800&q=80"
-                alt="CHED senior staff in the field"
+                src="/about-hero.jpg"
+                alt="COSSA-CHED members on an international study tour"
                 loading="lazy"
               />
               <div className="about-img-overlay" />
               <div className="about-img-caption">
-                "Supporting the people who protect Ghana's cocoa"
+                "Standing together, growing together"
               </div>
             </div>
 
