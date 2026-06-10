@@ -105,45 +105,29 @@ async function main() {
     ],
   })
 
-  // ── Sample news articles ───────────────────────────────────────────────────
+  // ── Initial news articles ──────────────────────────────────────────────────
+  // Only inserted into a fresh database (when the news table is empty).
+  // On the live VPS, news is managed through the admin portal.
   const newsCount = await prisma.newsArticle.count()
   if (newsCount === 0) {
     await prisma.newsArticle.createMany({
       data: [
         {
-          title:    'COSSA-CHED Elects New Executive Committee at 2026 Annual Congress',
-          excerpt:  'The CHED Senior Staff Association held its Annual Congress and successfully elected a new executive committee to lead for the 2026–2028 term.',
-          body:     'The CHED Senior Staff Association held its Annual Congress at COCOBOD Headquarters in Accra on 15 May 2026 and successfully elected a new executive committee to lead the association for the 2026–2028 term.\n\nMembers gathered from all ten cocoa-growing regions to exercise their democratic right in a transparent and orderly process. The newly elected officers — President, Vice President, General Secretary, Treasurer, Public Relations Officer, and Welfare Officer — will be officially inaugurated at a ceremony scheduled for June.\n\nThe outgoing executive committee was commended for its dedicated service over the past two years, particularly in negotiating improved welfare benefits and championing professional development initiatives for members.',
-          category: 'Congress',
-          imageUrl: 'https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?w=1200&q=80',
-          publishedAt: new Date('2026-05-15T09:00:00Z'),
+          title:    'COSSA-CHED Delegation Hosts Knowledge Exchange with German Agricultural Educators',
+          excerpt:  'A COSSA-CHED delegation engaged with the SDW Landwirtschaftliches Bildungswerk in Germany for a knowledge exchange on sustainable agricultural training and farmer-extension methods.',
+          body:     'A COSSA-CHED delegation engaged with the SDW Landwirtschaftliches Bildungswerk in Germany for a structured knowledge-exchange programme on sustainable agricultural training and farmer-extension methods.\n\nDuring the session, members of the delegation presented Ghanaian cocoa to their German hosts and shared the methodologies CHED extension officers use across the cocoa-growing regions of Ghana. The German side, in turn, walked the delegation through their education frameworks for agricultural professionals — covering curriculum design, hands-on field training, and how technical knowledge is transferred to working farmers.\n\nDiscussions also covered climate-resilient practices, soil health management, and how associations like COSSA-CHED can play a stronger role in continuous professional development for their members.\n\nThe COSSA-CHED Secretariat has committed to translating the lessons from this exchange into upcoming training cycles and is exploring opportunities for follow-up collaboration with SDW and partner institutions.',
+          category: 'International',
+          imageUrl: '/news_sample.jpg',
+          publishedAt: new Date('2026-05-22T09:00:00Z'),
           authorId: admin.id,
         },
         {
-          title:    'Extension Officers Complete CSSVD Awareness & Capsid Control Programme',
-          excerpt:  'A refresher training programme on Cocoa Swollen Shoot Virus Disease control and capsid management was held for CHED extension officers.',
-          body:     'A refresher training programme on Cocoa Swollen Shoot Virus Disease (CSSVD) control and capsid management was held for CHED extension officers across all ten cocoa-growing regions in early April 2026.\n\nThe programme equipped officers with updated protocols for early disease detection, modern capsid control methods, and recommended protective equipment guidance ahead of the peak disease season. Officers also reviewed the latest data on disease spread patterns and discussed strategies for engaging farmers in community-based control initiatives.\n\nCOSSA-CHED recognises the critical role its members play in safeguarding Ghana\'s cocoa output and supports continuous professional development as part of its core mandate.',
-          category: 'Training',
-          imageUrl: 'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=1200&q=80',
-          publishedAt: new Date('2026-04-03T09:00:00Z'),
-          authorId: admin.id,
-        },
-        {
-          title:    'COSSA-CHED Q2 Welfare Fund Applications Now Open for Members',
-          excerpt:  'The Welfare Committee announces that applications for the Q2 welfare fund cycle are now open. Submissions accepted through the member portal.',
-          body:     'The COSSA-CHED Welfare Committee is pleased to announce that applications for the Q2 welfare fund cycle are now open. Eligible members may apply for medical support, bereavement aid, education grants for their children, emergency loans, and other approved categories of assistance.\n\nApplications are submitted through the member portal under the Welfare Requests tab. Members are encouraged to submit applications early — the cycle closes on 30 May 2026. The Welfare Officer will review each request and the committee meets weekly to process approvals.\n\nMembers requiring guidance on the application process should contact the secretariat at cossa-ched@cocobod.gh or +233 30 266 1877.',
-          category: 'Welfare',
-          imageUrl: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=1200&q=80',
-          publishedAt: new Date('2026-03-18T09:00:00Z'),
-          authorId: admin.id,
-        },
-        {
-          title:    'Mass CSSVD Disease Control Drive Covers Over 45,000 Hectares',
-          excerpt:  'CHED officers completed the latest phase of the national CSSVD disease control campaign, treating more than 45,000 hectares of cocoa farms.',
-          body:     'CHED officers completed the latest phase of the national Cocoa Swollen Shoot Virus Disease (CSSVD) control campaign, treating more than 45,000 hectares of cocoa farms across the Ashanti, Western, and Eastern Regions.\n\nThe exercise forms part of COCOBOD\'s broader strategy to protect Ghana\'s cocoa output and support farmer livelihoods. COSSA-CHED members coordinated the field operations, working closely with farmer cooperatives to ensure thorough coverage of affected areas.\n\nThe association acknowledges the dedication and long hours put in by its members during the campaign and continues to advocate for improved field allowances and protective equipment provisions.',
-          category: 'Campaign',
-          imageUrl: 'https://images.unsplash.com/photo-1574482620881-6f2a6c9a98a2?w=1200&q=80',
-          publishedAt: new Date('2026-02-20T09:00:00Z'),
+          title:    'COSSA-CHED Members Tour Stüffel Gärtnerhof to Study Direct-to-Consumer Farm Models',
+          excerpt:  'As part of the international study programme, COSSA-CHED members visited Stüffel Gärtnerhof — a Demeter-certified organic farm in Germany — to observe sustainable production and direct-marketing practices.',
+          body:     'As part of the international study programme, COSSA-CHED members visited Stüffel Gärtnerhof & Hofladen — a Demeter-certified organic farm and farm shop in Germany — to observe sustainable production and direct-to-consumer marketing practices first-hand.\n\nThe visit gave delegates the opportunity to walk through the production areas, speak with the farm operators, and study how a regional farm balances organic certification, year-round operations, and a direct relationship with neighbouring consumers. The Demeter biodynamic model — which emphasises soil health, biodiversity, and closed-loop farming — was of particular interest given its parallels with cocoa-agroforestry practices being promoted in Ghana.\n\nMembers discussed how the principles observed — regional supply chains, traceability, and farmer-led marketing — could be adapted by CHED extension officers when supporting cocoa farmer cooperatives back home.\n\nThe delegation returned with concrete ideas for strengthening farmer training, improving on-farm record-keeping, and supporting the gradual move toward more sustainable cocoa production models.',
+          category: 'Study Tour',
+          imageUrl: '/about-hero.jpg',
+          publishedAt: new Date('2026-05-24T09:00:00Z'),
           authorId: admin.id,
         },
       ],
