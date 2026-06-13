@@ -49,6 +49,11 @@ img, video { max-width: 100%; height: auto; }
   font-family: 'Playfair Display', serif;
   font-size: 16px; font-weight: 700; color: #C9A84C; flex-shrink: 0;
 }
+.nav-logo-img {
+  height: 48px; width: auto;
+  flex-shrink: 0;
+  display: block;
+}
 .nav-logo-text { line-height: 1.1; }
 .nav-logo-text b {
   display: block; font-family: 'Playfair Display', serif;
@@ -850,6 +855,11 @@ img, video { max-width: 100%; height: auto; }
   display: flex; align-items: center; justify-content: center;
   font-family: 'Playfair Display', serif;
   font-size: 18px; font-weight: 700; color: #7A3A18; flex-shrink: 0;
+}
+.auth-logo-img {
+  height: 60px; width: auto;
+  flex-shrink: 0;
+  display: block;
 }
 .auth-logo b     { font-family: 'Playfair Display', serif; font-size: 1.3rem; color: #1E0F08; display: block; }
 .auth-logo small { display: block; font-size: 10px; color: #C8845A; letter-spacing: 0.1em; text-transform: uppercase; }

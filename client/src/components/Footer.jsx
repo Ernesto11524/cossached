@@ -8,7 +8,7 @@ export default function Footer() {
           {/* Brand */}
           <div className="footer-brand">
             <Link to="/" className="nav-logo" style={{ textDecoration: 'none' }}>
-              <div className="nav-logo-ring">C</div>
+              <img src="/logo.jpg" alt="COSSA-CHED" className="nav-logo-img" />
               <div className="nav-logo-text">
                 <b style={{ color: '#fff' }}>COSSA-CHED</b>
                 <small>CHED Senior Staff Association</small>

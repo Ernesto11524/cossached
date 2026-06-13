@@ -37,7 +37,7 @@ export default function ForgotPasswordPage() {
     <div className="auth-page">
       <div className="auth-card fade-in">
         <div className="auth-logo">
-          <div className="auth-logo-ring">C</div>
+          <img src="/logo.jpg" alt="COSSA-CHED" className="auth-logo-img" />
           <div>
             <b>COSSA-CHED Portal</b>
             <small>Forgot Password</small>

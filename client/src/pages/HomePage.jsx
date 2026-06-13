@@ -52,7 +52,7 @@ export default function HomePage() {
                 background: T.gold, display: 'inline-block', marginRight: 4,
               }}
             />
-            <span>Ghana Cocoa Board · CHED Senior Staff Association</span>
+            <span>COCOBOD Senior Staff Association · Cocoa Health and Extension Division</span>
           </div>
 
           <h1>
