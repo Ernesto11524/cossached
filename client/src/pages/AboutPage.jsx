@@ -8,11 +8,22 @@ import { NATIONAL_POSITIONS } from '../data/positions.js'
 import { api } from '../lib/api.js'
 import { T } from '../styles/tokens.js'
 
+const FEATURED_PARAGRAPHS = [
+  'Formal Congratulatory Message:',
+  'Commendation and Call to Collaborative Action – Newly Elected COSSA-CHED Executive Council',
+  'The Executive Director of the Cocoa Health and Extension Division (CHED), Dr. Richard Adu-Acheampong, extends his sincere congratulations to the newly elected national executives of the Cocoa Officers Senior Staff Association (COSSA-CHED).',
+  'Dr. Adu-Acheampong commends the members of the association for the successful exercise of their democratic mandate. In his address to the new leadership, he emphasized the critical role of the association in advancing the division\'s strategic objectives.',
+  '"I urge the incoming executive council to prioritize a spirit of synergy and collaboration," stated Dr. Adu-Acheampong.',
+  'By fostering a cohesive partnership with CHED management and remaining steadfast in your commitment to the welfare and professional development of our members, you will play an indispensable role in the continued success of our organization.',
+  'The Executive Director reaffirmed his commitment to maintaining an open dialogue with the new leadership, ensuring that the association remains a vital partner in the collective mission to drive excellence within the cocoa sector.',
+]
+
 export default function AboutPage() {
   const navigate = useNavigate()
   useReveal()
 
   const [execs, setExecs] = useState([])
+
   useEffect(() => {
     api.get('/members/public-executives')
        .then(d => setExecs(d.executives || []))
@@ -101,6 +112,36 @@ export default function AboutPage() {
         </div>
       </section>
 
+      {/* ── Featured article ─────────────────────────────────────────────── */}
+      <section className="section" style={{ background: T.creamDeep }}>
+        <div className="section-inner">
+          <div className="reveal" style={{ maxWidth: 820, margin: '0 auto' }}>
+            <SectionTag label="Latest" />
+            <h2 className="section-title" style={{ marginBottom: '1.5rem' }}>
+              Commendation and Call To Collaborative Action — Newly Elected COSSA-CHED Executive Council
+            </h2>
+            <div style={{
+              borderRadius: 10,
+              overflow: 'hidden',
+              marginBottom: '1.8rem',
+              boxShadow: '0 8px 32px rgba(30,15,8,0.10)',
+            }}>
+              <img
+                src="/api/news/cmqjo0gmy0030n4bamooom3hp/media"
+                alt="Newly Elected COSSA-CHED Executive Council"
+                loading="lazy"
+                style={{ width: '100%', display: 'block', maxHeight: 460, objectFit: 'cover' }}
+              />
+            </div>
+            {FEATURED_PARAGRAPHS.map((para, i) => (
+              <p key={i} className="section-body" style={{ marginTop: i === 0 ? 0 : '1rem' }}>
+                {para}
+              </p>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── CHED structure ───────────────────────────────────────────────── */}
       <section className="section" style={{ background: T.creamDeep }}>
         <div className="section-inner">
@@ -170,6 +211,66 @@ export default function AboutPage() {
                 </p>
               </div>
             ))}
+          </div>
+
+          {/* ── Regional Channels ── */}
+          <div className="reveal" style={{ marginTop: '3rem' }}>
+            <h3 style={{
+              fontFamily: "'Playfair Display', serif",
+              fontSize: '1.3rem',
+              fontWeight: 600,
+              color: T.brownDeep,
+              textAlign: 'center',
+              marginBottom: '1.5rem',
+            }}>
+              COSSA-CHED Regional <em>Channels</em>
+            </h3>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+              gap: '0.9rem',
+            }}>
+              {[
+                { num: 1, name: 'Eastern Region' },
+                { num: 2, name: 'Ashanti' },
+                { num: 3, name: 'Bono Ahafo' },
+                { num: 4, name: 'Western North' },
+                { num: 5, name: 'Central' },
+                { num: 6, name: 'Bunsu' },
+                { num: 7, name: 'Volta' },
+                { num: 8, name: 'Greater Accra Head Office' },
+                { num: 9, name: 'Western South' },
+              ].map(({ num, name }) => (
+                <div key={num} style={{
+                  background: T.white,
+                  borderRadius: 7,
+                  padding: '1rem 1.2rem',
+                  border: `1px solid rgba(122,58,24,0.09)`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.9rem',
+                }}>
+                  <div style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: '50%',
+                    background: T.brownDeep,
+                    color: T.gold,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontFamily: "'Playfair Display', serif",
+                    fontWeight: 700,
+                    fontSize: '0.95rem',
+                    flexShrink: 0,
+                  }}>{num}</div>
+                  <div>
+                    <div style={{ fontSize: 11, color: T.gold, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Channel {num}</div>
+                    <div style={{ fontSize: 13.5, color: T.brownDeep, fontWeight: 500, marginTop: 2 }}>{name}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>

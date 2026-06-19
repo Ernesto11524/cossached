@@ -34,6 +34,7 @@ if (!process.env.DATABASE_URL) {
 }
 
 const app  = express()
+app.set('trust proxy', 1)  // trust nginx reverse proxy
 const PORT = Number(process.env.PORT) || 3001
 
 // ── Security headers ──────────────────────────────────────────────────────
