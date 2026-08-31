@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import SectionTag from '../components/SectionTag.jsx'
+import NewsCarousel from '../components/NewsCarousel.jsx'
 import { useReveal } from '../hooks/useReveal.js'
 import { NEWS as FALLBACK_NEWS, ANNOUNCEMENTS } from '../data/placeholder.js'
 import { fmtDate } from '../lib/api.js'
@@ -39,7 +40,12 @@ function ArticleModal({ article, onClose }) {
           ✕
         </button>
 
-        {article.mediaType === 'video' ? (
+        {article.mediaItems?.length > 1 ? (
+          <NewsCarousel
+            items={article.mediaItems}
+            style={{ width: '100%', height: 360, background: '#000' }}
+          />
+        ) : article.mediaType === 'video' ? (
           <video
             className="article-modal-image"
             src={article.mediaUrl || article.imageUrl}
@@ -65,9 +71,9 @@ function ArticleModal({ article, onClose }) {
             <span style={{ fontSize: 12, color: T.brownPale, letterSpacing: '.06em' }}>
               {fmtDate(article.publishedAt || article.createdAt)}
             </span>
-            {article.author?.name && (
-              <span style={{ fontSize: 12, color: T.brownPale }}>
-                · By {article.author.name}
+            {article.department && (
+              <span style={{ fontSize: 12, color: T.brownWarm, fontWeight: 500 }}>
+                · {article.department}
               </span>
             )}
           </div>

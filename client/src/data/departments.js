@@ -21,4 +21,5 @@ export const DEPARTMENTS = [
   'Stores & Logistics',
   'Transport',
   'Estate & Maintenance',
+  'CODAPEC',
 ]

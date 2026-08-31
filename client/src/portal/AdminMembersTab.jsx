@@ -9,9 +9,9 @@ const EMPTY_FORM = {
   staffId:       '',
   email:         '',
   name:          '',
-  department:    '',     // either a preset value OR free text (when "Other" picked)
+  department:    '',
   position:      '',
-  positionScope: '',     // '' | 'NATIONAL' | 'REGIONAL'
+  positionScope: '',
   region:        '',
   phone:         '',
   role:          'MEMBER',
@@ -24,10 +24,17 @@ export default function AdminMembersTab() {
 
   const [showForm,    setShowForm]    = useState(false)
   const [form,        setForm]        = useState(EMPTY_FORM)
-  const [deptOther,   setDeptOther]   = useState(false) // true when "Other" picked
+  const [deptOther,   setDeptOther]   = useState(false)
   const [posting,     setPosting]     = useState(false)
   const [formErr,     setFormErr]     = useState('')
-  const [successInfo, setSuccessInfo] = useState(null)  // { name, staffId, tempPassword, email, phone }
+  const [successInfo, setSuccessInfo] = useState(null)
+
+  // Edit member state
+  const [editingMember,  setEditingMember]  = useState(null)
+  const [editForm,       setEditForm]       = useState({})
+  const [editDeptOther,  setEditDeptOther]  = useState(false)
+  const [editErr,        setEditErr]        = useState('')
+  const [saving,         setSaving]         = useState(false)
 
   const load = (q = '') => {
     setLoading(true)
@@ -51,13 +58,14 @@ export default function AdminMembersTab() {
   const handleChange = (field) => (e) =>
     setForm(prev => ({ ...prev, [field]: e.target.value }))
 
+  const handleEditChange = (field) => (e) =>
+    setEditForm(prev => ({ ...prev, [field]: e.target.value }))
+
   const submit = async (e) => {
     e.preventDefault()
     setFormErr('')
     setSuccessInfo(null)
 
-    // Client-side consistency check — scope is now derived from the position
-    // dropdown, but regional execs still need an explicit region.
     if (form.positionScope === 'REGIONAL' && !form.region) {
       setFormErr('Please pick a region for this regional position.')
       return
@@ -89,6 +97,51 @@ export default function AdminMembersTab() {
   const copyTemp = () => {
     if (successInfo?.tempPassword) {
       navigator.clipboard?.writeText(successInfo.tempPassword).catch(() => {})
+    }
+  }
+
+  const startEdit = (m) => {
+    setEditingMember(m)
+    setEditForm({
+      name:          m.name       || '',
+      email:         m.email      || '',
+      department:    m.department || '',
+      position:      m.position   || '',
+      positionScope: m.positionScope || '',
+      region:        m.region     || '',
+      phone:         m.phone      || '',
+      role:          m.role       || 'MEMBER',
+    })
+    setEditDeptOther(m.department ? !DEPARTMENTS.includes(m.department) : false)
+    setEditErr('')
+  }
+
+  const cancelEdit = () => {
+    setEditingMember(null)
+    setEditForm({})
+    setEditErr('')
+  }
+
+  const saveEdit = async (e) => {
+    e.preventDefault()
+    setEditErr('')
+
+    if (editForm.positionScope === 'REGIONAL' && !editForm.region) {
+      setEditErr('Please pick a region for this regional position.')
+      return
+    }
+
+    setSaving(true)
+    try {
+      const payload = { ...editForm }
+      Object.keys(payload).forEach(k => { if (payload[k] === '') payload[k] = null })
+      await api.patch(`/members/${editingMember.id}`, payload)
+      cancelEdit()
+      load(search)
+    } catch (err) {
+      setEditErr(err.message)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -159,7 +212,7 @@ export default function AdminMembersTab() {
           value={search}
           onChange={handleSearch}
         />
-        <button className="btn btn-gold" onClick={() => { setShowForm(s => !s); setOkMsg('') }}>
+        <button className="btn btn-gold" onClick={() => { setShowForm(s => !s); setSuccessInfo(null) }}>
           {showForm ? 'Cancel' : '+ Provision New Member'}
         </button>
       </div>
@@ -328,7 +381,6 @@ export default function AdminMembersTab() {
               </small>
             </div>
 
-            {/* Regional execs require a region — surface the reminder if missing */}
             {form.positionScope === 'REGIONAL' && !form.region && (
               <div
                 style={{
@@ -377,6 +429,173 @@ export default function AdminMembersTab() {
         </form>
       )}
 
+      {/* ── Edit member modal ──────────────────────────────────────────── */}
+      {editingMember && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(15,8,4,0.55)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '1rem',
+          }}
+          onClick={cancelEdit}
+        >
+          <form
+            onSubmit={saveEdit}
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: '#fff',
+              borderRadius: 10,
+              padding: '1.8rem',
+              width: '100%',
+              maxWidth: 680,
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.2rem' }}>
+              <h3 className="serif" style={{ fontSize: '1.1rem', color: T.brownDeep, margin: 0 }}>
+                Edit Member — {editingMember.staffId}
+              </h3>
+              <button
+                type="button"
+                onClick={cancelEdit}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.brownPale, fontSize: 22, lineHeight: 1 }}
+                aria-label="Close"
+              >×</button>
+            </div>
+
+            {editErr && <div className="auth-error" style={{ marginBottom: '1rem' }}>{editErr}</div>}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                <label className="form-label">Full Name *</label>
+                <input
+                  className="form-input"
+                  value={editForm.name}
+                  onChange={handleEditChange('name')}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Email *</label>
+                <input
+                  type="email"
+                  className="form-input"
+                  value={editForm.email}
+                  onChange={handleEditChange('email')}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Phone</label>
+                <input
+                  type="tel"
+                  className="form-input"
+                  placeholder="+233 24 000 0000"
+                  value={editForm.phone}
+                  onChange={handleEditChange('phone')}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Department</label>
+                <select
+                  className="form-select"
+                  value={editDeptOther ? '__OTHER__' : (DEPARTMENTS.includes(editForm.department) ? editForm.department : (editForm.department ? '__OTHER__' : ''))}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    if (v === '__OTHER__') {
+                      setEditDeptOther(true)
+                      setEditForm(prev => ({ ...prev, department: '' }))
+                    } else {
+                      setEditDeptOther(false)
+                      setEditForm(prev => ({ ...prev, department: v }))
+                    }
+                  }}
+                >
+                  <option value="">— No department —</option>
+                  {DEPARTMENTS.map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                  <option value="__OTHER__">Other (specify)…</option>
+                </select>
+                {editDeptOther && (
+                  <input
+                    className="form-input"
+                    style={{ marginTop: 8 }}
+                    placeholder="Type the department name"
+                    value={editForm.department}
+                    onChange={handleEditChange('department')}
+                    autoFocus
+                  />
+                )}
+              </div>
+              <div className="form-group">
+                <label className="form-label">Region</label>
+                <select className="form-select" value={editForm.region} onChange={handleEditChange('region')}>
+                  <option value="">— No region —</option>
+                  {GHANA_REGIONS.map(r => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Executive Position</label>
+                <select
+                  className="form-select"
+                  value={editForm.position}
+                  onChange={(e) => {
+                    const pos   = e.target.value
+                    const scope = scopeOfPosition(pos) || ''
+                    setEditForm(prev => ({ ...prev, position: pos, positionScope: scope }))
+                  }}
+                >
+                  <option value="">— Regular member (no executive role) —</option>
+                  <optgroup label="🇬🇭  National Executive">
+                    {NATIONAL_POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                  </optgroup>
+                  <optgroup label="📍  Regional Executive">
+                    {REGIONAL_POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                  </optgroup>
+                </select>
+              </div>
+              {editForm.positionScope === 'REGIONAL' && !editForm.region && (
+                <div
+                  style={{
+                    gridColumn: '1/-1',
+                    padding: '.7rem .9rem',
+                    background: '#fef3c7',
+                    border: '1px solid #fcd34d',
+                    borderRadius: 5,
+                    fontSize: 12,
+                    color: '#92400e',
+                  }}
+                >
+                  This regional position needs a region — please pick one above.
+                </div>
+              )}
+              <div className="form-group">
+                <label className="form-label">Role</label>
+                <select className="form-select" value={editForm.role} onChange={handleEditChange('role')}>
+                  <option value="MEMBER">Member</option>
+                  <option value="ADMIN">Admin</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '.6rem', marginTop: '1.4rem' }}>
+              <button type="submit" className="btn btn-gold" disabled={saving}>
+                {saving ? 'Saving…' : 'Save Changes'}
+              </button>
+              <button type="button" className="btn btn-outline-dark" onClick={cancelEdit}>
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {/* ── Active members ─────────────────────────────────────────────── */}
       <div className="widget">
         <div className="widget-header">
@@ -422,6 +641,13 @@ export default function AdminMembersTab() {
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          className="btn btn-gold btn-sm"
+                          onClick={() => startEdit(m)}
+                        >
+                          ✏️ Edit
+                        </button>
                         <button
                           type="button"
                           className="btn btn-outline-dark btn-sm"
@@ -481,6 +707,13 @@ export default function AdminMembersTab() {
                     <td style={{ fontSize: 13, color: T.textMid }}>{m.department || '—'}</td>
                     <td>
                       <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          className="btn btn-gold btn-sm"
+                          onClick={() => startEdit(m)}
+                        >
+                          ✏️ Edit
+                        </button>
                         <button className="btn btn-outline-dark btn-sm" onClick={() => toggleActive(m)}>
                           Reactivate
                         </button>
