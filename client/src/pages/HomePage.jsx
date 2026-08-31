@@ -52,7 +52,7 @@ export default function HomePage() {
                 background: T.gold, display: 'inline-block', marginRight: 4,
               }}
             />
-            <span>Ghana Cocoa Board · CHED Senior Staff Association</span>
+            <span>COCOBOD Senior Staff Association · Cocoa Health and Extension Division</span>
           </div>
 
           <h1>
@@ -116,11 +116,6 @@ export default function HomePage() {
                 senior staff across the Cocoa Health &amp; Extension Division of
                 COCOBOD. We work to ensure fair treatment, professional welfare,
                 and strong industrial relations between our members and the Board.
-              </p>
-              <p className="section-body" style={{ marginTop: '1rem' }}>
-                CHED's mission — disease control, extension services, and farmer
-                support — is carried forward every day by the very people
-                COSSA-CHED exists to serve.
               </p>
               <button
                 className="btn btn-gold"

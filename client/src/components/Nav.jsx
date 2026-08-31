@@ -27,7 +27,7 @@ export default function Nav() {
     <>
       <nav className="nav">
         <Link to="/" className="nav-logo">
-          <div className="nav-logo-ring">C</div>
+          <img src="/logo.jpg" alt="COSSA-CHED" className="nav-logo-img" />
           <div className="nav-logo-text">
             <b>COSSA-CHED</b>
             <small>CHED Senior Staff Association</small>

@@ -101,14 +101,14 @@ export const HERO_STATS = [
 ]
 
 export const ABOUT_PILLARS_HOME = [
-  { icon: '🤝', title: 'Advocacy',    desc: 'Representing CHED members in all negotiations with COCOBOD management' },
+  { icon: '🤝', title: 'Advocacy',    desc: 'Representing CHED Senior Staff members in all negotiations with COCOBOD management' },
   { icon: '❤️',  title: 'Welfare',    desc: 'Health support, social aid and member wellbeing programmes'             },
   { icon: '📚', title: 'Development', desc: 'Training seminars and professional capacity-building initiatives'       },
   { icon: '⚖️',  title: 'Relations',  desc: 'Maintaining fair and constructive industrial relations'                  },
 ]
 
 export const ABOUT_PILLARS_FULL = [
-  { icon: '🎯', title: 'Mission', desc: 'To champion the welfare, rights and professional development of all CHED senior staff.'  },
+  { icon: '🎯', title: 'Mission', desc: 'The CHED Senior Staff Association represents the interests of senior staff across the Cocoa Health & Extension Division of COCOBOD. We work to ensure fair treatment, professional welfare, and strong industrial relations between our members and the Board.' },
   { icon: '🔭', title: 'Vision',  desc: 'A united, empowered CHED workforce driving excellence across Ghana\'s cocoa sector.'        },
   { icon: '🏛️', title: 'Values',  desc: 'Integrity, solidarity, transparency and dedicated service to every member.'              },
   { icon: '🤲', title: 'CSR',     desc: 'Supporting cocoa-farming communities alongside COCOBOD\'s broader social mandate.'         },
