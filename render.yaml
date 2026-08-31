@@ -56,5 +56,5 @@ services:
 
 databases:
   - name: cossa-ched-db
-    plan: starter
+    plan: basic-256mb
     postgresMajorVersion: 16
