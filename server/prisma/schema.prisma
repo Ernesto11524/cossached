@@ -138,7 +138,8 @@ model GalleryItem {
   caption       String?
   mediaFilename String
   mediaType     String   // "image" | "video"
-  category      String?  // optional album label, e.g. "Annual Congress 2025"
+  category      String
+  department    String?  // optional album label, e.g. "Annual Congress 2025"
   uploadedById  String
   uploadedBy    User     @relation("GalleryUploads", fields: [uploadedById], references: [id])
   createdAt     DateTime @default(now())
@@ -245,14 +246,28 @@ model NewsArticle {
   excerpt       String
   body          String
   category      String
+  department    String?
   imageUrl      String?  // legacy / external image URL fallback
   mediaFilename String?  // uploaded file on disk
   mediaType     String?  // "image" | "video"
+  mediaItems    NewsMedia[]
   publishedAt   DateTime @default(now())
   authorId      String
   author        User     @relation(fields: [authorId], references: [id])
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+model NewsMedia {
+  id         String      @id @default(cuid())
+  articleId  String
+  article    NewsArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  filename   String
+  mediaType  String
+  order      Int         @default(0)
+  createdAt  DateTime    @default(now())
+
+  @@index([articleId])
 }
 
 model Announcement {
