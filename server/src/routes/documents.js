@@ -1,51 +1,14 @@
 import { Router } from 'express'
-import multer from 'multer'
-import { randomUUID } from 'crypto'
-import path from 'path'
-import { fileURLToPath } from 'url'
-import { createReadStream, existsSync, mkdirSync } from 'fs'
-import { unlink } from 'fs/promises'
 import { prisma } from '../lib/prisma.js'
 import { requireAuth } from '../middleware/requireAuth.js'
 import { requireAdmin } from '../middleware/requireAdmin.js'
 import { notifyAllActive } from '../lib/notifications.js'
+import { single } from '../lib/uploads.js'
+import { fileUrl, downloadUrl, removeFile } from '../lib/storage.js'
 
-const __dirname  = path.dirname(fileURLToPath(import.meta.url))
-const UPLOADS_DIR = path.join(__dirname, '../../uploads')
-mkdirSync(UPLOADS_DIR, { recursive: true })
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
-  filename:    (_req, file, cb)  => cb(null, `${randomUUID()}${path.extname(file.originalname)}`),
-})
-
-// Expanded: documents + images + videos + audio + zip
-const ALLOWED_TYPES = new Set([
-  // Documents
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/vnd.ms-powerpoint',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  'text/plain',
-  'text/csv',
-  // Images
-  'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml',
-  // Video
-  'video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo',
-  // Audio
-  'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/x-m4a',
-  // Archive
-  'application/zip', 'application/x-zip-compressed',
-])
-
-const upload = multer({
-  storage,
-  limits:     { fileSize: 100 * 1024 * 1024 }, // 100 MB — videos can be larger
-  fileFilter: (_req, file, cb) => cb(null, ALLOWED_TYPES.has(file.mimetype)),
-})
+// Files live in Vercel Blob under documents/<key> (see lib/storage.js for the
+// allowed types and the 100 MB limit — same list as before).
+const upload = { single: (field) => single('documents', field) }
 
 function classify(mimeType) {
   if (mimeType?.startsWith('image/')) return 'image'
@@ -117,12 +80,9 @@ router.get('/:id/view', async (req, res) => {
   const doc = await prisma.document.findUnique({ where: { id: req.params.id } })
   if (!doc) return res.status(404).json({ error: 'Document not found.' })
 
-  const filePath = path.join(UPLOADS_DIR, doc.filename)
-  if (!existsSync(filePath)) return res.status(404).json({ error: 'File missing from server.' })
-
-  res.setHeader('Content-Type', doc.mimeType)
-  res.setHeader('Content-Disposition', `inline; filename="${doc.originalName}"`)
-  createReadStream(filePath).pipe(res)
+  // Auth was checked above — hand the browser off to the file on Blob storage
+  res.setHeader('Cache-Control', 'private, no-store')
+  res.redirect(302, fileUrl('documents', doc.filename))
 })
 
 // GET /api/documents/:id/download — forces download
@@ -130,12 +90,8 @@ router.get('/:id/download', async (req, res) => {
   const doc = await prisma.document.findUnique({ where: { id: req.params.id } })
   if (!doc) return res.status(404).json({ error: 'Document not found.' })
 
-  const filePath = path.join(UPLOADS_DIR, doc.filename)
-  if (!existsSync(filePath)) return res.status(404).json({ error: 'File missing from server.' })
-
-  res.setHeader('Content-Disposition', `attachment; filename="${doc.originalName}"`)
-  res.setHeader('Content-Type', doc.mimeType)
-  createReadStream(filePath).pipe(res)
+  res.setHeader('Cache-Control', 'private, no-store')
+  res.redirect(302, downloadUrl('documents', doc.filename))
 })
 
 // DELETE /api/documents/:id (admin)
@@ -143,7 +99,7 @@ router.delete('/:id', requireAdmin, async (req, res) => {
   const doc = await prisma.document.findUnique({ where: { id: req.params.id } })
   if (!doc) return res.status(404).json({ error: 'Document not found.' })
 
-  await unlink(path.join(UPLOADS_DIR, doc.filename)).catch(() => {})
+  await removeFile('documents', doc.filename)
   await prisma.document.delete({ where: { id: req.params.id } })
   res.json({ ok: true })
 })

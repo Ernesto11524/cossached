@@ -1,0 +1,15 @@
+{
+  "name": "cossached",
+  "private": true,
+  "type": "module",
+  "description": "COSSA-CHED website — Vite/React client + Express API, deployed as one Vercel project",
+  "scripts": {
+    "install:all": "npm ci --prefix server && npm ci --prefix client",
+    "build": "npm run build:server && npm run build:client",
+    "build:server": "cd server && npx prisma generate",
+    "build:client": "cd client && npm run build"
+  },
+  "engines": {
+    "node": "22.x"
+  }
+}
