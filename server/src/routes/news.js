@@ -1,33 +1,17 @@
 import { Router } from 'express'
 import { z } from 'zod'
-import multer from 'multer'
-import path from 'path'
-import { fileURLToPath } from 'url'
-import { randomUUID } from 'crypto'
-import { createReadStream, existsSync, mkdirSync } from 'fs'
-import { unlink } from 'fs/promises'
 import { prisma } from '../lib/prisma.js'
 import { requireAuth } from '../middleware/requireAuth.js'
 import { requireAdmin } from '../middleware/requireAdmin.js'
+import { single, array } from '../lib/uploads.js'
+import { fileUrl, removeFile } from '../lib/storage.js'
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const NEWS_DIR  = path.join(__dirname, '../../uploads/news')
-mkdirSync(NEWS_DIR, { recursive: true })
-
-const ALLOWED = new Set([
-  'image/jpeg', 'image/png', 'image/webp', 'image/gif',
-  'video/mp4', 'video/webm', 'video/quicktime',
-])
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, NEWS_DIR),
-  filename:    (_req, file, cb)  => cb(null, `${randomUUID()}${path.extname(file.originalname)}`),
-})
-const upload = multer({
-  storage,
-  limits:     { fileSize: 100 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => cb(null, ALLOWED.has(file.mimetype)),
-})
+// Files live in Vercel Blob under news/<key> (images + videos, 100 MB max).
+const upload = {
+  single: (field)      => single('news', field),
+  array:  (field, max) => array('news', field, max),
+}
+const unlinkNews = (filename) => removeFile('news', filename)
 
 function classifyMedia(mimeType) {
   if (mimeType?.startsWith('image/')) return 'image'
@@ -148,7 +132,7 @@ router.delete('/:id/media/:mediaId', requireAuth, requireAdmin, async (req, res)
     where: { id: req.params.mediaId, articleId: req.params.id },
   })
   if (!item) return res.status(404).json({ error: 'Media item not found.' })
-  await unlink(path.join(NEWS_DIR, item.filename)).catch(() => {})
+  await unlinkNews(item.filename)
   await prisma.newsMedia.delete({ where: { id: req.params.mediaId } })
   res.json({ ok: true })
 })
@@ -168,12 +152,12 @@ router.patch('/:id', requireAuth, requireAdmin, upload.single('media'), async (r
     data.mediaFilename = req.file.filename
     data.mediaType     = classifyMedia(req.file.mimetype)
     if (existing.mediaFilename) {
-      await unlink(path.join(NEWS_DIR, existing.mediaFilename)).catch(() => {})
+      await unlinkNews(existing.mediaFilename)
     }
   }
 
   if (req.body.removeMedia === 'true' && existing.mediaFilename) {
-    await unlink(path.join(NEWS_DIR, existing.mediaFilename)).catch(() => {})
+    await unlinkNews(existing.mediaFilename)
     data.mediaFilename = null
     data.mediaType     = null
   }
@@ -193,10 +177,10 @@ router.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
     include: { mediaItems: true },
   })
   if (existing?.mediaFilename) {
-    await unlink(path.join(NEWS_DIR, existing.mediaFilename)).catch(() => {})
+    await unlinkNews(existing.mediaFilename)
   }
   for (const m of existing?.mediaItems || []) {
-    await unlink(path.join(NEWS_DIR, m.filename)).catch(() => {})
+    await unlinkNews(m.filename)
   }
   await prisma.newsArticle.delete({ where: { id: req.params.id } })
   res.json({ ok: true })
@@ -204,17 +188,9 @@ router.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
 
 // ── helper ───────────────────────────────────────────────────────────────────
 function serveFile(res, filename) {
-  const filePath = path.join(NEWS_DIR, filename)
-  if (!existsSync(filePath)) return res.status(404).json({ error: 'File missing.' })
-  const ext = path.extname(filename).toLowerCase()
-  const mimeByExt = {
-    '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
-    '.webp': 'image/webp', '.gif': 'image/gif',
-    '.mp4': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime',
-  }
-  res.setHeader('Content-Type', mimeByExt[ext] || 'application/octet-stream')
-  res.setHeader('Content-Disposition', 'inline')
-  createReadStream(filePath).pipe(res)
+  // Public news media — redirect to the file on Blob storage (served from CDN)
+  res.setHeader('Cache-Control', 'public, max-age=3600')
+  res.redirect(302, fileUrl('news', filename))
 }
 
 export default router

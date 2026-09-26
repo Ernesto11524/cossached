@@ -1,18 +1,10 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
-import multer from 'multer'
-import path from 'path'
-import { fileURLToPath } from 'url'
-import { mkdirSync } from 'fs'
-import { unlink } from 'fs/promises'
-import { randomUUID } from 'crypto'
 import { prisma } from '../lib/prisma.js'
 import { requireAuth } from '../middleware/requireAuth.js'
-
-const __dirname   = path.dirname(fileURLToPath(import.meta.url))
-const AVATARS_DIR = path.join(__dirname, '../../uploads/avatars')
-mkdirSync(AVATARS_DIR, { recursive: true })
+import { single } from '../lib/uploads.js'
+import { removeFile } from '../lib/storage.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -57,21 +49,8 @@ router.post('/change-password', async (req, res) => {
 })
 
 // ── Avatar upload ────────────────────────────────────────────────────────
-const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
-
-const avatarStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, AVATARS_DIR),
-  filename:    (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase()
-    cb(null, `${randomUUID()}${ext || '.jpg'}`)
-  },
-})
-
-const avatarUpload = multer({
-  storage:    avatarStorage,
-  limits:     { fileSize: 5 * 1024 * 1024 }, // 5 MB
-  fileFilter: (_req, file, cb) => cb(null, ALLOWED_IMAGE_TYPES.has(file.mimetype)),
-})
+// Stored in Vercel Blob under avatars/<key> — JPEG/PNG/WebP, 5 MB max
+const avatarUpload = { single: (field) => single('avatars', field) }
 
 router.post('/avatar', avatarUpload.single('avatar'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'A valid image file (JPEG/PNG/WebP) is required.' })
@@ -88,7 +67,7 @@ router.post('/avatar', avatarUpload.single('avatar'), async (req, res) => {
   })
 
   if (current?.avatarFilename) {
-    await unlink(path.join(AVATARS_DIR, current.avatarFilename)).catch(() => {})
+    await removeFile('avatars', current.avatarFilename)
   }
 
   res.json({ user })
@@ -107,7 +86,7 @@ router.delete('/avatar', async (req, res) => {
   })
 
   if (current?.avatarFilename) {
-    await unlink(path.join(AVATARS_DIR, current.avatarFilename)).catch(() => {})
+    await removeFile('avatars', current.avatarFilename)
   }
 
   res.json({ user })

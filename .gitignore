@@ -23,3 +23,6 @@ npm-debug.log*
 
 # PM2
 .pm2/
+
+# Vercel
+.vercel/

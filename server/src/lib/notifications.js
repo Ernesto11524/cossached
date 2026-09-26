@@ -1,6 +1,10 @@
 import { prisma } from './prisma.js'
 import { sendMail } from './mailer.js'
 
+// Portal link used in notification emails (was hard-coded to localhost)
+const portalUrl = () =>
+  `${process.env.CLIENT_ORIGIN?.split(',')[0]?.trim() || 'http://localhost:5173'}/portal`
+
 /**
  * Create an in-app notification for one user, and optionally send an email.
  * Failures are logged but never thrown — notifications must never break the
@@ -25,11 +29,11 @@ export async function notify({ userId, type, title, body, link, email = false })
         sendMail({
           to:      user.email,
           subject: `[COSSA-CHED] ${title}`,
-          text:    `Hello ${user.name},\n\n${title}${body ? `\n\n${body}` : ''}\n\nLog in to the COSSA-CHED portal to view: http://localhost:5173/portal\n\n— COSSA-CHED Secretariat`,
+          text:    `Hello ${user.name},\n\n${title}${body ? `\n\n${body}` : ''}\n\nLog in to the COSSA-CHED portal to view: ${portalUrl()}\n\n— COSSA-CHED Secretariat`,
           html:    `<p>Hello ${user.name},</p>
                     <p><strong>${title}</strong></p>
                     ${body ? `<p>${body.replace(/\n/g, '<br>')}</p>` : ''}
-                    <p><a href="http://localhost:5173/portal">Open the COSSA-CHED portal</a></p>
+                    <p><a href="${portalUrl()}">Open the COSSA-CHED portal</a></p>
                     <p style="color:#888;font-size:12px">— COSSA-CHED Secretariat</p>`,
         }).catch(err => console.error('[notify-mail]', err.message))
       }

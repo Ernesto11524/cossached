@@ -1,33 +1,14 @@
 import { Router } from 'express'
 import { z } from 'zod'
-import multer from 'multer'
 import path from 'path'
-import { fileURLToPath } from 'url'
-import { randomUUID } from 'crypto'
-import { createReadStream, existsSync, mkdirSync } from 'fs'
-import { unlink } from 'fs/promises'
 import { prisma } from '../lib/prisma.js'
 import { requireAuth } from '../middleware/requireAuth.js'
 import { requireAdmin } from '../middleware/requireAdmin.js'
+import { array } from '../lib/uploads.js'
+import { fileUrl, removeFile } from '../lib/storage.js'
 
-const __dirname    = path.dirname(fileURLToPath(import.meta.url))
-const GALLERY_DIR  = path.join(__dirname, '../../uploads/gallery')
-mkdirSync(GALLERY_DIR, { recursive: true })
-
-const ALLOWED = new Set([
-  'image/jpeg', 'image/png', 'image/webp', 'image/gif',
-  'video/mp4', 'video/webm', 'video/quicktime',
-])
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, GALLERY_DIR),
-  filename:    (_req, file, cb)  => cb(null, `${randomUUID()}${path.extname(file.originalname)}`),
-})
-const upload = multer({
-  storage,
-  limits:     { fileSize: 200 * 1024 * 1024 }, // 200 MB videos OK
-  fileFilter: (_req, file, cb) => cb(null, ALLOWED.has(file.mimetype)),
-})
+// Files live in Vercel Blob under gallery/<key> (images + videos, 200 MB max).
+const upload = { array: (field, max) => array('gallery', field, max) }
 
 function classify(mimeType) {
   if (mimeType?.startsWith('image/')) return 'image'
@@ -85,18 +66,8 @@ router.get('/:id/media', async (req, res) => {
   })
   if (!item) return res.status(404).end()
 
-  const filePath = path.join(GALLERY_DIR, item.mediaFilename)
-  if (!existsSync(filePath)) return res.status(404).end()
-
-  const ext = path.extname(item.mediaFilename).toLowerCase()
-  const mimeByExt = {
-    '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
-    '.webp': 'image/webp', '.gif': 'image/gif',
-    '.mp4': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime',
-  }
-  res.setHeader('Content-Type', mimeByExt[ext] || 'application/octet-stream')
-  res.setHeader('Content-Disposition', 'inline')
-  createReadStream(filePath).pipe(res)
+  res.setHeader('Cache-Control', 'private, max-age=300')
+  res.redirect(302, fileUrl('gallery', item.mediaFilename))
 })
 
 // POST /api/gallery — upload one OR MANY files at once (admin).
@@ -115,8 +86,8 @@ router.post('/', requireAdmin, upload.array('media', 30), async (req, res) => {
   })
   const parse = schema.safeParse(req.body)
   if (!parse.success) {
-    // Tidy up any files multer already wrote to disk
-    await Promise.all(files.map(f => unlink(path.join(GALLERY_DIR, f.filename)).catch(() => {})))
+    // Tidy up any files already uploaded to storage
+    await Promise.all(files.map(f => removeFile('gallery', f.filename)))
     return res.status(400).json({ error: parse.error.errors[0].message })
   }
 
@@ -193,7 +164,7 @@ router.delete('/:id', requireAdmin, async (req, res) => {
   const item = await prisma.galleryItem.findUnique({ where: { id: req.params.id } })
   if (!item) return res.status(404).json({ error: 'Item not found.' })
 
-  await unlink(path.join(GALLERY_DIR, item.mediaFilename)).catch(() => {})
+  await removeFile('gallery', item.mediaFilename)
   await prisma.galleryItem.delete({ where: { id: req.params.id } })
   res.json({ ok: true })
 })
